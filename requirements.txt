@@ -1,0 +1,15 @@
+now lets make a fluid interface like an slide to side to next step. This is interface will be for all system, but lets start with tickets "Chamados". I will provide the guide to each field:
+Numero: Auto assign and crescent  - automatic/dont appear
+Empresa: auto assign based on logged user. - automatic/dont appear
+Titulo: User will type, give a tip like "Câmera não funciona" - appear
+Descricao: User will type, give a tip like "Explique melhor sobre o problema" - appear
+Status: auto assign based on event, like if oppened = aberto, if answered = Em atendimento, etc... -  automati qc/dont appear
+Prioridade: auto assign based on "ativo" and the "problem", the logic will be implemented after. Just keep all with "Normal" - automatic/dont appear
+Ultima atualizacao: auto assign based in the time of the last modification, like answer, status change, etc... - automatic/dont appear
+Requisitante Contato: auto assign based on user wich openned the ticket - dont appear/automatic
+Agente Contato: auto assign based on user group, that will be implemented in future, just let "Admin" for default for now - dont appear/automatic
+Proprietario Contato:  auto assign based on user wich openned the ticket - dont appear/automatic - is duplicated its the same of Requisitante Contato
+Categoria: User will select from the avaible categories - appear
+Ativo: will list based on the previous choice, ativo has categoria, o the system will filter to show to user. - appear
+Fechado em: auto assign based when the technician will change status to "Fechado"
+Origem OS Pendencia: auto assign based on when the technician is performing a service and creating a work order, which will then generate a support ticket. - dont appear/automatic - future implement

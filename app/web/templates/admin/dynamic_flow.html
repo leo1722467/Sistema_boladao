@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluxo Dinâmico - {{ model_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .flow-container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      margin: 20px 0;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
+
+    .progress-bar {
+      background: #e9ecef;
+      border-radius: 10px;
+      height: 8px;
+      margin-bottom: 30px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.3s ease;
+    }
+
+    .step-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+    }
+
+    .step-counter {
+      font-size: 14px;
+      color: #666;
+      font-weight: 600;
+    }
+
+    .step-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      margin: 20px 0 10px 0;
+    }
+
+    .step-description {
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .form-label.required::after {
+      content: " *";
+      color: #dc3545;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-input.error {
+      border-color: #dc3545;
+    }
+
+    .form-error {
+      color: #dc3545;
+      font-size: 14px;
+      margin-top: 5px;
+      display: none;
+    }
+
+    .form-error.show {
+      display: block;
+    }
+
+    .form-help {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #545b62;
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .summary-section {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+
+    .summary-label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .summary-value {
+      color: #666;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .success-message {
+      background: #d4edda;
+      color: #155724;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #c3e6cb;
+      text-align: center;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #f5c6cb;
+      text-align: center;
+    }
+
+    .step-content {
+      display: none;
+      animation: slideIn 0.5s ease-out;
+    }
+
+    .step-content.active {
+      display: block;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .field-type-info {
+      font-size: 12px;
+      color: #666;
+      font-style: italic;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="flow-container">
+      <div class="header">
+        <h1>🎮 Fluxo Dinâmico</h1>
+        <p>Criação passo a passo para <strong id="model-name">{{ model_name }}</strong></p>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+
+      <div class="step-info">
+        <div class="step-counter" id="step-counter">Passo 1 de X</div>
+        <div style="font-size: 14px; color: #666;">
+          <span id="completed-steps">0</span> campos preenchidos
+        </div>
+      </div>
+
+      <div id="error-message" class="error-message" style="display: none;"></div>
+      <div id="success-message" class="success-message" style="display: none;"></div>
+
+      <form id="dynamic-form">
+        <div id="steps-container">
+          <!-- Steps will be generated here -->
+        </div>
+
+        <!-- Summary Step -->
+        <div class="step-content" id="summary-step">
+          <div class="step-title">📋 Resumo</div>
+          <div class="step-description">Revise os dados antes de finalizar:</div>
+          
+          <div class="summary-section" id="summary-content">
+            <!-- Summary will be generated here -->
+          </div>
+        </div>
+
+        <!-- Success Step -->
+        <div class="step-content" id="success-step">
+          <div class="step-title">✅ Sucesso!</div>
+          <div class="step-description">Registro criado com sucesso!</div>
+          
+          <div class="success-message">
+            <h3>🎉 Parabéns!</h3>
+            <p>O registro foi criado com sucesso no sistema.</p>
+            <p><strong>ID:</strong> <span id="created-id"></span></p>
+          </div>
+        </div>
+      </form>
+
+      <div class="navigation">
+        <button type="button" id="back-btn" class="btn btn-secondary" style="display: none;">
+          ← Anterior
+        </button>
+        <div>
+          <a href="/admin/flow-engine" class="btn btn-secondary">
+            🔧 Configurar Novo Fluxo
+          </a>
+        </div>
+        <button type="button" id="next-btn" class="btn btn-primary">
+          Próximo →
+        </button>
+        <button type="button" id="finish-btn" class="btn btn-primary" style="display: none;">
+          ✅ Finalizar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class DynamicFlow {
+      constructor() {
+        this.currentStep = 0;
+        this.totalSteps = 0;
+        this.formData = {};
+        this.flowConfig = null;
+        this.modelName = '';
+        
+        this.init();
+      }
+
+      init() {
+        this.loadFlowConfig();
+        this.bindEvents();
+      }
+
+      loadFlowConfig() {
+        // Get flow config from localStorage (set by flow engine)
+        const configStr = localStorage.getItem('flowConfig');
+        if (!configStr) {
+          this.showError('Configuração do fluxo não encontrada. Redirecionando...');
+          setTimeout(() => {
+            window.location.href = '/admin/flow-engine';
+          }, 2000);
+          return;
+        }
+
+        try {
+          this.flowConfig = JSON.parse(configStr);
+          this.modelName = this.flowConfig.model;
+          this.totalSteps = this.flowConfig.fields.length + 1; // +1 for summary
+          
+          document.getElementById('model-name').textContent = this.modelName;
+          this.generateSteps();
+          this.updateUI();
+        } catch (error) {
+          this.showError('Erro ao carregar configuração: ' + error.message);
+        }
+      }
+
+      generateSteps() {
+        const container = document.getElementById('steps-container');
+        
+        container.innerHTML = this.flowConfig.fields.map((field, index) => `
+          <div class="step-content" data-step="${index}">
+            <div class="step-title">📝 ${field.name}</div>
+            <div class="step-description">
+              Preencha o campo ${field.name}
+              ${field.nullable ? '(opcional)' : '(obrigatório)'}
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label ${!field.nullable ? 'required' : ''}" for="field-${field.name}">
+                ${field.name}
+              </label>
+              <div class="field-type-info">Tipo: ${field.type}</div>
+              ${this.generateFieldInput(field)}
+              <div class="form-error" id="error-${field.name}"></div>
+              ${field.nullable ? '<div class="form-help">Este campo é opcional</div>' : ''}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      generateFieldInput(field) {
+        const fieldName = field.name;
+        const fieldType = field.type.toLowerCase();
+        
+        // Determine input type based on field type
+        let inputType = 'text';
+        let inputElement = 'input';
+        let extraAttrs = '';
+        
+        if (fieldType.includes('int') || fieldType.includes('numeric')) {
+          inputType = 'number';
+        } else if (fieldType.includes('date')) {
+          inputType = 'date';
+        } else if (fieldType.includes('time')) {
+          inputType = 'time';
+        } else if (fieldType.includes('email')) {
+          inputType = 'email';
+        } else if (fieldType.includes('text') && fieldType.includes('large')) {
+          inputElement = 'textarea';
+          extraAttrs = 'rows="4"';
+        }
+        
+        if (inputElement === 'textarea') {
+          return `<textarea class="form-input" id="field-${fieldName}" name="${fieldName}" ${extraAttrs}></textarea>`;
+        } else {
+          return `<input type="${inputType}" class="form-input" id="field-${fieldName}" name="${fieldName}" ${extraAttrs}>`;
+        }
+      }
+
+      bindEvents() {
+        document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
+        document.getElementById('back-btn').addEventListener('click', () => this.prevStep());
+        document.getElementById('finish-btn').addEventListener('click', () => this.submitForm());
+        
+        // Bind input events for validation
+        document.addEventListener('input', (e) => {
+          if (e.target.classList.contains('form-input')) {
+            this.validateField(e.target);
+          }
+        });
+      }
+
+      nextStep() {
+        if (this.currentStep < this.totalSteps - 1) {
+          // Validate current step
+          if (this.currentStep < this.flowConfig.fields.length) {
+            const field = this.flowConfig.fields[this.currentStep];
+            const input = document.getElementById(`field-${field.name}`);
+            
+            if (!this.validateField(input)) {
+              return;
+            }
+            
+            // Save field data
+            this.formData[field.name] = input.value;
+          }
+          
+          this.currentStep++;
+          this.updateUI();
+          
+          if (this.currentStep === this.totalSteps - 1) {
+            this.generateSummary();
+          }
+        }
+      }
+
+      prevStep() {
+        if (this.currentStep > 0) {
+          this.currentStep--;
+          this.updateUI();
+        }
+      }
+
+      updateUI() {
+        // Update progress bar
+        const progress = ((this.currentStep + 1) / this.totalSteps) * 100;
+        document.getElementById('progress-fill').style.width = `${progress}%`;
+        
+        // Update step counter
+        const stepCounter = document.getElementById('step-counter');
+        if (this.currentStep < this.flowConfig.fields.length) {
+          stepCounter.textContent = `Passo ${this.currentStep + 1} de ${this.flowConfig.fields.length}`;
+        } else if (this.currentStep === this.flowConfig.fields.length) {
+          stepCounter.textContent = 'Resumo';
+        } else {
+          stepCounter.textContent = 'Finalizado';
+        }
+        
+        // Update completed steps
+        document.getElementById('completed-steps').textContent = Object.keys(this.formData).length;
+        
+        // Update step visibility
+        document.querySelectorAll('.step-content').forEach((step, index) => {
+          step.classList.remove('active');
+        });
+        
+        if (this.currentStep < this.flowConfig.fields.length) {
+          document.querySelector(`[data-step="${this.currentStep}"]`).classList.add('active');
+        } else if (this.currentStep === this.flowConfig.fields.length) {
+          document.getElementById('summary-step').classList.add('active');
+        } else {
+          document.getElementById('success-step').classList.add('active');
+        }
+        
+        // Update navigation
+        const backBtn = document.getElementById('back-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const finishBtn = document.getElementById('finish-btn');
+        
+        backBtn.style.display = this.currentStep > 0 ? 'block' : 'none';
+        
+        if (this.currentStep === this.flowConfig.fields.length) {
+          nextBtn.style.display = 'none';
+          finishBtn.style.display = 'block';
+        } else if (this.currentStep > this.flowConfig.fields.length) {
+          nextBtn.style.display = 'none';
+          finishBtn.style.display = 'none';
+        } else {
+          nextBtn.style.display = 'block';
+          finishBtn.style.display = 'none';
+        }
+      }
+
+      validateField(input) {
+        const fieldName = input.name;
+        const field = this.flowConfig.fields.find(f => f.name === fieldName);
+        const errorDiv = document.getElementById(`error-${fieldName}`);
+        
+        // Clear previous errors
+        input.classList.remove('error');
+        errorDiv.classList.remove('show');
+        
+        // Check required fields
+        if (!field.nullable && !input.value.trim()) {
+          this.showFieldError(input, errorDiv, 'Este campo é obrigatório');
+          return false;
+        }
+        
+        // Type-specific validation
+        const fieldType = field.type.toLowerCase();
+        if (input.value.trim()) {
+          if (fieldType.includes('int') && isNaN(parseInt(input.value))) {
+            this.showFieldError(input, errorDiv, 'Deve ser um número inteiro');
+            return false;
+          }
+          
+          if (fieldType.includes('email') && !this.isValidEmail(input.value)) {
+            this.showFieldError(input, errorDiv, 'Email inválido');
+            return false;
+          }
+        }
+        
+        return true;
+      }
+
+      showFieldError(input, errorDiv, message) {
+        input.classList.add('error');
+        errorDiv.textContent = message;
+        errorDiv.classList.add('show');
+      }
+
+      isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      }
+
+      generateSummary() {
+        const summaryContent = document.getElementById('summary-content');
+        
+        summaryContent.innerHTML = `
+          <h3 style="margin-top: 0;">Dados do ${this.modelName}</h3>
+          ${Object.entries(this.formData).map(([key, value]) => `
+            <div class="summary-item">
+              <div class="summary-label">${key}:</div>
+              <div class="summary-value">${value || '<em>Não informado</em>'}</div>
+            </div>
+          `).join('')}
+        `;
+      }
+
+      async submitForm() {
+        try {
+          finishBtn.disabled = true;
+          finishBtn.textContent = 'Salvando...';
+          
+          const response = await fetch(`/admin/${this.modelName.toLowerCase()}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.getAccessToken()}`
+            },
+            body: JSON.stringify(this.formData)
+          });
+          
+          if (!response.ok) {
+            throw new Error('Erro ao salvar registro');
+          }
+          
+          const result = await response.json();
+          
+          // Show success
+          document.getElementById('created-id').textContent = result.id || 'N/A';
+          this.currentStep++;
+          this.updateUI();
+          
+          // Clear config
+          localStorage.removeItem('flowConfig');
+          
+        } catch (error) {
+          this.showError('Erro ao salvar: ' + error.message);
+          finishBtn.disabled = false;
+          finishBtn.textContent = '✅ Finalizar';
+        }
+      }
+
+      getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const [name, value] = cookie.trim().split('=');
+          if (name === 'access_token') {
+            return value;
+          }
+        }
+        return null;
+      }
+
+      showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+          errorDiv.style.display = 'none';
+        }, 5000);
+      }
+
+      showSuccess(message) {
+        const successDiv = document.getElementById('success-message');
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+        setTimeout(() => {
+          successDiv.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    // Initialize the dynamic flow
+    document.addEventListener('DOMContentLoaded', () => {
+      new DynamicFlow();
+    });
+  </script>
+</body>
+</html>

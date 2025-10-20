@@ -1,0 +1,1 @@
+"""Web router package for HTML pages and static assets."""

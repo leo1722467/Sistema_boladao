@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tables - Admin System</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    .nav-buttons { margin-bottom: 20px; }
+    .nav-buttons a { 
+      display: inline-block; 
+      margin-right: 10px; 
+      padding: 8px 16px; 
+      background: #007bff; 
+      color: white; 
+      text-decoration: none; 
+      border-radius: 4px; 
+    }
+    .nav-buttons a:hover { background: #0056b3; }
+    h1 { color: #333; margin-bottom: 10px; }
+    .page-description { color: #666; margin-bottom: 30px; font-size: 16px; }
+    
+    .model-group { 
+      margin-bottom: 30px; 
+      background: #f8f9fa; 
+      border-radius: 8px; 
+      padding: 20px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .group-header { 
+      color: #495057; 
+      margin: 0 0 15px 0; 
+      padding-bottom: 8px; 
+      border-bottom: 2px solid #dee2e6; 
+      font-size: 18px;
+    }
+    
+    .model-list { 
+      list-style: none; 
+      padding: 0; 
+      margin: 0; 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+      gap: 12px; 
+    }
+    
+    .model-item { 
+      background: white; 
+      padding: 12px 16px; 
+      border-radius: 6px; 
+      border: 1px solid #e9ecef; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+    
+    .model-item:hover { 
+      border-color: #007bff; 
+      box-shadow: 0 2px 8px rgba(0,123,255,0.15); 
+      transform: translateY(-1px);
+    }
+    
+    .model-name { 
+      font-weight: 600; 
+      color: #343a40; 
+      font-size: 14px;
+    }
+    
+    .model-actions { 
+      display: flex; 
+      gap: 8px; 
+    }
+    
+    .action-link { 
+      padding: 4px 8px; 
+      text-decoration: none; 
+      border-radius: 4px; 
+      font-size: 12px; 
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    
+    .list-link { 
+      background: #e3f2fd; 
+      color: #1976d2; 
+    }
+    
+    .list-link:hover { 
+      background: #1976d2; 
+      color: white; 
+    }
+    
+    .create-link { 
+      background: #e8f5e8; 
+      color: #388e3c; 
+    }
+    
+    .create-link:hover { 
+      background: #388e3c; 
+      color: white; 
+    }
+    
+    #models { margin-top: 20px; }
+    
+    @media (max-width: 768px) {
+      .model-list { grid-template-columns: 1fr; }
+      .model-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .model-actions { align-self: stretch; justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav-buttons">
+      <a href="/dashboard">← Dashboard</a>
+    </div>
+    
+    <h1>Database Tables</h1>
+    <p class="page-description">Quick access to all data models organized by functional areas. Use [list] to view existing records or [create] to add new ones.</p>
+    
+    <div id="models">
+      <p>Loading models...</p>
+    </div>
+  </div>
+  
+  <script src="/static/auth.js"></script>
+  <script src="/static/tables.js"></script>
+</body>
+</html>

@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flow Engine - Configurador de Fluxos</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .flow-container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      margin: 20px 0;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 32px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
+
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+      gap: 20px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      border-radius: 25px;
+      background: #f8f9fa;
+      color: #6c757d;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .step.active {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    .step.completed {
+      background: #28a745;
+      color: white;
+    }
+
+    .step-number {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .step.active .step-number {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .step.completed .step-number {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .step-content {
+      display: none;
+      animation: slideIn 0.5s ease-out;
+    }
+
+    .step-content.active {
+      display: block;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .model-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .model-card {
+      background: #f8f9fa;
+      border: 2px solid #e9ecef;
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .model-card:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+    }
+
+    .model-card.selected {
+      border-color: #667eea;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .model-card h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+    }
+
+    .model-card p {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    .field-list {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+
+    .field-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .field-item:hover {
+      border-color: #667eea;
+      transform: translateX(5px);
+    }
+
+    .field-item.selected {
+      border-color: #667eea;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .field-info {
+      flex: 1;
+    }
+
+    .field-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .field-type {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .field-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .order-input {
+      width: 60px;
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .selected-fields {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .selected-fields h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .selected-field-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: white;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+
+    .navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #545b62;
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #f5c6cb;
+    }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #c3e6cb;
+    }
+
+    .flow-preview {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .flow-preview h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .preview-step {
+      background: white;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-left: 4px solid #667eea;
+    }
+
+    .preview-step-title {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .preview-step-field {
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="flow-container">
+      <div class="header">
+        <h1>🎮 Flow Engine</h1>
+        <p>Configure fluxos passo a passo personalizados para qualquer modelo</p>
+      </div>
+
+      <div class="step-indicator">
+        <div class="step active" data-step="1">
+          <div class="step-number">1</div>
+          <span>Selecionar Modelo</span>
+        </div>
+        <div class="step" data-step="2">
+          <div class="step-number">2</div>
+          <span>Configurar Campos</span>
+        </div>
+        <div class="step" data-step="3">
+          <div class="step-number">3</div>
+          <span>Gerar Fluxo</span>
+        </div>
+      </div>
+
+      <div id="error-message" class="error" style="display: none;"></div>
+      <div id="success-message" class="success" style="display: none;"></div>
+
+      <!-- Step 1: Model Selection -->
+      <div class="step-content active" data-step="1">
+        <h2>Selecione o Modelo</h2>
+        <p>Escolha qual modelo você deseja usar para criar o fluxo passo a passo:</p>
+        
+        <div id="models-loading" class="loading">
+          Carregando modelos disponíveis...
+        </div>
+        
+        <div id="model-grid" class="model-grid" style="display: none;">
+          <!-- Models will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Step 2: Field Configuration -->
+      <div class="step-content" data-step="2">
+        <h2>Configure os Campos</h2>
+        <p>Selecione quais campos incluir no fluxo e defina a ordem dos passos:</p>
+        
+        <div id="fields-loading" class="loading" style="display: none;">
+          Carregando campos do modelo...
+        </div>
+        
+        <div id="field-configuration" style="display: none;">
+          <div class="field-list" id="field-list">
+            <!-- Fields will be loaded here -->
+          </div>
+          
+          <div class="selected-fields">
+            <h3>Campos Selecionados (Ordem dos Passos)</h3>
+            <div id="selected-fields-list">
+              <p style="color: #666; font-style: italic;">Nenhum campo selecionado ainda</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Flow Generation -->
+      <div class="step-content" data-step="3">
+        <h2>Gerar Fluxo</h2>
+        <p>Revise a configuração e gere o fluxo passo a passo:</p>
+        
+        <div class="flow-preview" id="flow-preview">
+          <!-- Preview will be generated here -->
+        </div>
+      </div>
+
+      <div class="navigation">
+        <button id="back-btn" class="btn btn-secondary" style="display: none;">
+          ← Voltar
+        </button>
+        <div>
+          <a href="/web/dashboard" class="btn btn-secondary">
+            🏠 Dashboard
+          </a>
+        </div>
+        <button id="next-btn" class="btn btn-primary" disabled>
+          Próximo →
+        </button>
+        <button id="generate-btn" class="btn btn-primary" style="display: none;">
+          🚀 Gerar Fluxo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class FlowEngine {
+      constructor() {
+        this.currentStep = 1;
+        this.selectedModel = null;
+        this.selectedFields = [];
+        this.modelSchema = null;
+        
+        this.init();
+      }
+
+      init() {
+        this.loadModels();
+        this.bindEvents();
+      }
+
+      bindEvents() {
+        document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
+        document.getElementById('back-btn').addEventListener('click', () => this.prevStep());
+        document.getElementById('generate-btn').addEventListener('click', () => this.generateFlow());
+      }
+
+      async loadModels() {
+        try {
+          const response = await fetch('/admin/models', {
+            headers: {
+              'Authorization': `Bearer ${this.getAccessToken()}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Erro ao carregar modelos');
+          }
+          
+          const models = await response.json();
+          this.renderModels(models);
+        } catch (error) {
+          this.showError('Erro ao carregar modelos: ' + error.message);
+        }
+      }
+
+      renderModels(models) {
+        const modelsLoading = document.getElementById('models-loading');
+        const modelGrid = document.getElementById('model-grid');
+        
+        modelsLoading.style.display = 'none';
+        modelGrid.style.display = 'grid';
+        
+        modelGrid.innerHTML = models.map(model => `
+          <div class="model-card" data-model="${model}">
+            <h3>${model}</h3>
+            <p>Modelo ${model.toLowerCase()}</p>
+          </div>
+        `).join('');
+        
+        // Bind model selection
+        modelGrid.querySelectorAll('.model-card').forEach(card => {
+          card.addEventListener('click', () => this.selectModel(card.dataset.model));
+        });
+      }
+
+      async selectModel(modelName) {
+        // Update UI
+        document.querySelectorAll('.model-card').forEach(card => {
+          card.classList.remove('selected');
+        });
+        document.querySelector(`[data-model="${modelName}"]`).classList.add('selected');
+        
+        this.selectedModel = modelName;
+        document.getElementById('next-btn').disabled = false;
+        
+        // Load model schema
+        await this.loadModelSchema(modelName);
+      }
+
+      async loadModelSchema(modelName) {
+        try {
+          const response = await fetch(`/admin/${modelName}/schema`, {
+            headers: {
+              'Authorization': `Bearer ${this.getAccessToken()}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Erro ao carregar schema do modelo');
+          }
+          
+          this.modelSchema = await response.json();
+        } catch (error) {
+          this.showError('Erro ao carregar schema: ' + error.message);
+        }
+      }
+
+      nextStep() {
+        if (this.currentStep < 3) {
+          this.currentStep++;
+          this.updateStepUI();
+          
+          if (this.currentStep === 2) {
+            this.renderFields();
+          } else if (this.currentStep === 3) {
+            this.renderPreview();
+          }
+        }
+      }
+
+      prevStep() {
+        if (this.currentStep > 1) {
+          this.currentStep--;
+          this.updateStepUI();
+        }
+      }
+
+      updateStepUI() {
+        // Update step indicator
+        document.querySelectorAll('.step').forEach((step, index) => {
+          const stepNum = index + 1;
+          step.classList.remove('active', 'completed');
+          
+          if (stepNum === this.currentStep) {
+            step.classList.add('active');
+          } else if (stepNum < this.currentStep) {
+            step.classList.add('completed');
+          }
+        });
+        
+        // Update step content
+        document.querySelectorAll('.step-content').forEach((content, index) => {
+          content.classList.remove('active');
+          if (index + 1 === this.currentStep) {
+            content.classList.add('active');
+          }
+        });
+        
+        // Update navigation
+        const backBtn = document.getElementById('back-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const generateBtn = document.getElementById('generate-btn');
+        
+        backBtn.style.display = this.currentStep > 1 ? 'block' : 'none';
+        
+        if (this.currentStep === 3) {
+          nextBtn.style.display = 'none';
+          generateBtn.style.display = 'block';
+        } else {
+          nextBtn.style.display = 'block';
+          generateBtn.style.display = 'none';
+          nextBtn.disabled = this.currentStep === 2 && this.selectedFields.length === 0;
+        }
+      }
+
+      renderFields() {
+        if (!this.modelSchema) return;
+        
+        const fieldsLoading = document.getElementById('fields-loading');
+        const fieldConfiguration = document.getElementById('field-configuration');
+        const fieldList = document.getElementById('field-list');
+        
+        fieldsLoading.style.display = 'block';
+        fieldConfiguration.style.display = 'none';
+        
+        setTimeout(() => {
+          fieldsLoading.style.display = 'none';
+          fieldConfiguration.style.display = 'block';
+          
+          fieldList.innerHTML = this.modelSchema.columns.map(column => `
+            <div class="field-item" data-field="${column.name}">
+              <div class="field-info">
+                <div class="field-name">${column.name}</div>
+                <div class="field-type">${column.type} ${column.nullable ? '(opcional)' : '(obrigatório)'}</div>
+              </div>
+              <div class="field-controls">
+                <input type="number" class="order-input" placeholder="Ordem" min="1" style="display: none;">
+              </div>
+            </div>
+          `).join('');
+          
+          // Bind field selection
+          fieldList.querySelectorAll('.field-item').forEach(item => {
+            item.addEventListener('click', () => this.toggleField(item));
+          });
+        }, 500);
+      }
+
+      toggleField(fieldItem) {
+        const fieldName = fieldItem.dataset.field;
+        const orderInput = fieldItem.querySelector('.order-input');
+        
+        if (fieldItem.classList.contains('selected')) {
+          // Deselect
+          fieldItem.classList.remove('selected');
+          orderInput.style.display = 'none';
+          orderInput.value = '';
+          this.selectedFields = this.selectedFields.filter(f => f.name !== fieldName);
+        } else {
+          // Select
+          fieldItem.classList.add('selected');
+          orderInput.style.display = 'block';
+          orderInput.value = this.selectedFields.length + 1;
+          
+          const fieldInfo = this.modelSchema.columns.find(c => c.name === fieldName);
+          this.selectedFields.push({
+            name: fieldName,
+            type: fieldInfo.type,
+            nullable: fieldInfo.nullable,
+            order: this.selectedFields.length + 1
+          });
+        }
+        
+        this.updateSelectedFieldsList();
+        document.getElementById('next-btn').disabled = this.selectedFields.length === 0;
+      }
+
+      updateSelectedFieldsList() {
+        const selectedFieldsList = document.getElementById('selected-fields-list');
+        
+        if (this.selectedFields.length === 0) {
+          selectedFieldsList.innerHTML = '<p style="color: #666; font-style: italic;">Nenhum campo selecionado ainda</p>';
+          return;
+        }
+        
+        const sortedFields = [...this.selectedFields].sort((a, b) => a.order - b.order);
+        
+        selectedFieldsList.innerHTML = sortedFields.map((field, index) => `
+          <div class="selected-field-item">
+            <div>
+              <strong>Passo ${index + 1}:</strong> ${field.name}
+              <span style="font-size: 12px; opacity: 0.7;">(${field.type})</span>
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              ${field.nullable ? 'Opcional' : 'Obrigatório'}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      renderPreview() {
+        const flowPreview = document.getElementById('flow-preview');
+        const sortedFields = [...this.selectedFields].sort((a, b) => a.order - b.order);
+        
+        flowPreview.innerHTML = `
+          <h3>Preview do Fluxo: ${this.selectedModel}</h3>
+          <p><strong>Modelo:</strong> ${this.selectedModel}</p>
+          <p><strong>Total de Passos:</strong> ${sortedFields.length}</p>
+          
+          <div style="margin-top: 20px;">
+            ${sortedFields.map((field, index) => `
+              <div class="preview-step">
+                <div class="preview-step-title">Passo ${index + 1}: ${field.name}</div>
+                <div class="preview-step-field">
+                  Tipo: ${field.type} | ${field.nullable ? 'Campo opcional' : 'Campo obrigatório'}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      async generateFlow() {
+        try {
+          const flowConfig = {
+            model: this.selectedModel,
+            fields: this.selectedFields.sort((a, b) => a.order - b.order)
+          };
+          
+          // For now, just show success and redirect
+          this.showSuccess('Fluxo configurado com sucesso! Redirecionando...');
+          
+          setTimeout(() => {
+            // Store config in localStorage for now
+            localStorage.setItem('flowConfig', JSON.stringify(flowConfig));
+            window.location.href = `/admin/dynamic-flow?model=${this.selectedModel}`;
+          }, 2000);
+          
+        } catch (error) {
+          this.showError('Erro ao gerar fluxo: ' + error.message);
+        }
+      }
+
+      getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const [name, value] = cookie.trim().split('=');
+          if (name === 'access_token') {
+            return value;
+          }
+        }
+        return null;
+      }
+
+      showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+          errorDiv.style.display = 'none';
+        }, 5000);
+      }
+
+      showSuccess(message) {
+        const successDiv = document.getElementById('success-message');
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+        setTimeout(() => {
+          successDiv.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    // Initialize the flow engine
+    document.addEventListener('DOMContentLoaded', () => {
+      new FlowEngine();
+    });
+  </script>
+</body>
+</html>

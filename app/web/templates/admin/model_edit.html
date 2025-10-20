@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Editar - {{ model }} #{{ item_id }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .container { 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px; 
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+      color: #212529;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .breadcrumb {
+      background: #f8f9fa;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    .breadcrumb a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+    
+    .breadcrumb span {
+      color: #6c757d;
+      margin: 0 8px;
+    }
+    
+    .form-container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      border: 1px solid #e9ecef;
+      margin-bottom: 25px;
+    }
+    
+    #edit-form {
+      display: grid;
+      gap: 20px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      color: #495057;
+      font-size: 14px;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 12px;
+      border: 2px solid #e9ecef;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s ease;
+      background: white;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #ffc107;
+      box-shadow: 0 0 0 3px rgba(255,193,7,0.1);
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    
+    .form-group input[type="checkbox"] {
+      width: auto;
+      margin-right: 8px;
+    }
+    
+    .checkbox-group {
+      flex-direction: row;
+      align-items: center;
+    }
+    
+    .actions-bar {
+      display: flex;
+      gap: 15px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+      min-width: 120px;
+      text-align: center;
+    }
+    
+    .btn-primary {
+      background: #ffc107;
+      color: #212529;
+    }
+    
+    .btn-primary:hover {
+      background: #e0a800;
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary:disabled {
+      background: #6c757d;
+      color: white;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #545b62;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary:disabled, .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid #f5c6cb;
+      margin-top: 15px;
+      display: none;
+    }
+    
+    .error.show {
+      display: block;
+    }
+    
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid #c3e6cb;
+      margin-top: 15px;
+      display: none;
+    }
+    
+    .success.show {
+      display: block;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    .required {
+      color: #dc3545;
+    }
+    
+    .item-info {
+      background: #e9ecef;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #495057;
+    }
+    
+    .item-info strong {
+      color: #212529;
+    }
+    
+    /* Form field styles */
+    .form-field {
+      margin-bottom: 20px;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+      font-size: 14px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      background-color: white;
+    }
+
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-checkbox {
+      width: auto !important;
+      margin-right: 8px;
+    }
+
+    /* Foreign key container styles */
+    .foreign-key-container {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .foreign-key-container .form-select {
+      flex: 1;
+    }
+
+    .add-related-btn {
+      width: 40px;
+      height: 40px;
+      border: 2px solid #10b981;
+      background-color: #10b981;
+      color: white;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .add-related-btn:hover {
+      background-color: #059669;
+      border-color: #059669;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f9fafb;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      color: #111827;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background-color: #f3f4f6;
+      color: #374151;
+    }
+
+    .modal-body {
+      padding: 24px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      background-color: #f9fafb;
+    }
+
+    @media (max-width: 768px) {
+      .actions-bar {
+        flex-direction: column;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+      
+      .form-container {
+        padding: 20px;
+      }
+      
+      .header {
+        padding: 20px;
+      }
+      
+      .header h1 {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/dashboard">Dashboard</a>
+      <span>›</span>
+      <a href="/web/tables">Tables</a>
+      <span>›</span>
+      <a href="/admin/{{ model }}">{{ model }}</a>
+      <span>›</span>
+      <strong>Editar #{{ item_id }}</strong>
+    </div>
+    
+    <div class="header">
+      <h1>Editar {{ model }} #{{ item_id }}</h1>
+    </div>
+    
+    <div class="form-container">
+      <div class="item-info">
+        <strong>ID do Registro:</strong> {{ item_id }}
+      </div>
+      
+      <form id="edit-form">
+        <div class="loading">Carregando dados do registro...</div>
+      </form>
+      
+      <div class="actions-bar">
+        <button id="save-btn" type="button" class="btn btn-primary">
+          💾 Salvar Alterações
+        </button>
+        <button type="button" onclick="window.location.href='/admin/{{ model }}'" class="btn btn-secondary">
+          ← Voltar
+        </button>
+      </div>
+      
+      <div id="error" class="error"></div>
+      <div id="success" class="success"></div>
+    </div>
+  </div>
+  
+  <script src="/static/auth.js"></script>
+  <script>
+    window.__MODEL__ = "{{ model }}";
+    window.__ITEM_ID__ = {{ item_id }};
+  </script>
+  <script src="/static/admin_edit.js?v=2"></script>
+</body>
+</html>

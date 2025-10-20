@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - {{ model }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .container { 
+      max-width: 1400px; 
+      margin: 0 auto; 
+      padding: 20px; 
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    
+    .actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-primary {
+      background: #007bff;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #0056b3;
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background: #545b62;
+      transform: translateY(-1px);
+    }
+    
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      overflow: hidden;
+      border: 1px solid #e9ecef;
+    }
+    
+    .table-wrapper {
+      overflow-x: auto;
+    }
+    
+    #items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    #items-table th {
+      background: #f8f9fa;
+      color: #495057;
+      font-weight: 600;
+      padding: 15px 12px;
+      text-align: left;
+      border-bottom: 2px solid #dee2e6;
+      white-space: nowrap;
+    }
+    
+    #items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #dee2e6;
+      vertical-align: middle;
+    }
+    
+    #items-table tr:hover {
+      background-color: #f8f9fa;
+    }
+    
+    #items-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+    }
+    
+    .btn-edit {
+      background: #ffc107;
+      color: #212529;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-edit:hover {
+      background: #e0a800;
+      transform: translateY(-1px);
+    }
+    
+    .btn-delete {
+      background: #dc3545;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-delete:hover {
+      background: #c82333;
+      transform: translateY(-1px);
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6c757d;
+    }
+    
+    .empty-state h3 {
+      margin: 0 0 10px 0;
+      color: #495057;
+    }
+    
+    .empty-state p {
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    .breadcrumb {
+      background: #f8f9fa;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    .breadcrumb a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+    
+    .breadcrumb span {
+      color: #6c757d;
+      margin: 0 8px;
+    }
+    
+    @media (max-width: 768px) {
+      .actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .btn {
+        text-align: center;
+      }
+      
+      .header {
+        padding: 20px;
+      }
+      
+      .header h1 {
+        font-size: 20px;
+      }
+      
+      #items-table {
+        font-size: 12px;
+      }
+      
+      #items-table th,
+      #items-table td {
+        padding: 8px 6px;
+      }
+      
+      .action-buttons {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/dashboard">Dashboard</a>
+      <span>›</span>
+      <a href="/web/tables">Tables</a>
+      <span>›</span>
+      <strong>{{ model }}</strong>
+    </div>
+    
+    <div class="header">
+      <h1>{{ model }} - Gerenciar Registros</h1>
+    </div>
+    
+    <div class="actions-bar">
+      <a href="/admin/flow-engine" class="btn btn-primary" style="background: linear-gradient(135deg, #28a745, #20c997); margin-right: 10px;">
+        🎮 Flow Engine (Criar Fluxo Personalizado)
+      </a>
+      {% if model.lower() == 'chamado' %}
+      <a href="/admin/chamado/create-flow" class="btn btn-primary" style="background: linear-gradient(135deg, #667eea, #764ba2); margin-right: 10px;">
+        🎮 Criar Chamado (Fluxo Passo a Passo)
+      </a>
+      {% endif %}
+      <a href="/admin/{{ model }}/create" class="btn btn-primary">
+        ➕ Criar Novo Registro
+      </a>
+      <a href="/web/tables" class="btn btn-secondary">
+        ← Voltar aos Modelos
+      </a>
+    </div>
+    
+    <div class="table-container">
+      <div class="table-wrapper">
+        <table id="items-table">
+          <tbody>
+            <tr>
+              <td colspan="100%" class="loading">Carregando registros...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <script src="/static/auth.js"></script>
+  <script>
+    window.__MODEL__ = "{{ model }}";
+  </script>
+  <script src="/static/admin_model.js"></script>
+</body>
+</html>
