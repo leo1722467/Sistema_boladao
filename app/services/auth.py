@@ -2,12 +2,13 @@ import logging
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password, verify_password, create_jwt_token
-from app.core.config import settings
+from app.core.config import get_settings
 from app.repositories.user_auth import UserAuthRepository
 from app.repositories.contato import ContatoRepository
 from app.db.models import AuditLog, UserAuth, Contato
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class AuthService:
@@ -76,8 +77,10 @@ class AuthService:
         if not auth.ativo:
             raise ValueError("User inactive")
 
-        access = create_jwt_token(subject=str(auth.id), expires_in=settings.access_expires)
-        refresh = create_jwt_token(subject=str(auth.id), expires_in=settings.refresh_expires, claims={"type": "refresh"})
+        access_expires = settings.ACCESS_EXPIRES_MIN * 60
+        refresh_expires = settings.REFRESH_EXPIRES_DAYS * 24 * 60 * 60
+        access = create_jwt_token(subject=str(auth.id), expires_in=access_expires)
+        refresh = create_jwt_token(subject=str(auth.id), expires_in=refresh_expires, claims={"type": "refresh"})
 
         log = AuditLog(
             id_usuario=auth.id,
@@ -103,6 +106,8 @@ class AuthService:
             Tuple of new access and refresh tokens.
         """
 
-        access = create_jwt_token(subject=str(auth.id), expires_in=settings.access_expires)
-        refresh = create_jwt_token(subject=str(auth.id), expires_in=settings.refresh_expires, claims={"type": "refresh"})
+        access_expires = settings.ACCESS_EXPIRES_MIN * 60
+        refresh_expires = settings.REFRESH_EXPIRES_DAYS * 24 * 60 * 60
+        access = create_jwt_token(subject=str(auth.id), expires_in=access_expires)
+        refresh = create_jwt_token(subject=str(auth.id), expires_in=refresh_expires, claims={"type": "refresh"})
         return access, refresh

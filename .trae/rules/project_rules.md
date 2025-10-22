@@ -1,0 +1,1 @@
+Use commando prompt instead powershell

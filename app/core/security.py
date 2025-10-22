@@ -5,7 +5,9 @@ from typing import Any, Dict, Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import settings
+from app.core.config import get_settings
+
+settings = get_settings()
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +57,7 @@ def create_jwt_token(subject: str, expires_in: int, claims: Optional[Dict[str, A
     payload: Dict[str, Any] = {"sub": subject, "iat": now, "exp": now + timedelta(seconds=expires_in)}
     if claims:
         payload.update(claims)
-    token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_alg)
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
     return token
 
 
@@ -70,7 +72,7 @@ def verify_jwt_token(token: str) -> Optional[Dict[str, Any]]:
     """
 
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_alg])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         return payload
     except JWTError as exc:
         logger.warning("JWT verification failed: %s", exc)

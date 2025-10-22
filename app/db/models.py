@@ -6,6 +6,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy import text, MetaData
 from app.db.base import Base
+from sqlalchemy import UniqueConstraint
 
 convention = {
     "ix": "ix__%(column_0_label)s",
@@ -182,28 +183,42 @@ class LocalInstalacao(Base):
 
 class Ativo(Base):
     __tablename__ = "ativo"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "serial_text", name="uq_ativo_empresa_serial"),
+    )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
-    tag: Mapped[str | None] = mapped_column(Text, unique=True)
-    descricao: Mapped[str | None] = mapped_column(Text)
-    contrato_id: Mapped[int | None] = mapped_column(ForeignKey("contrato.id"))
-    status_ativo_id: Mapped[int | None] = mapped_column(ForeignKey("status_ativo.id"))
-    tipo_ativo_id: Mapped[int | None] = mapped_column(ForeignKey("tipo_ativo.id"))
-    acesso_ativo_id: Mapped[int | None] = mapped_column(ForeignKey("acesso_ativo.id"))
-    local_instalacao_id: Mapped[int | None] = mapped_column(ForeignKey("local_instalacao.id"))
-    interno: Mapped[bool | None] = mapped_column(Boolean)
-    periodicidade: Mapped[str | None] = mapped_column(Text)
-    data_instalacao: Mapped[DateTime | None] = mapped_column(DateTime)
-    serial: Mapped[int | None] = mapped_column(ForeignKey("estoque.id"))
-    criado_em: Mapped[DateTime | None] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+    id = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id = mapped_column(ForeignKey("empresa.id"), index=True, nullable=False)
 
+    tag = mapped_column(Text, unique=True, nullable=True)
+    descricao = mapped_column(Text, nullable=True)
+
+    contrato_id = mapped_column(ForeignKey("contrato.id"), nullable=True)
+    status_ativo_id = mapped_column(ForeignKey("status_ativo.id"), nullable=True)
+    tipo_ativo_id = mapped_column(ForeignKey("tipo_ativo.id"), nullable=True)
+    acesso_ativo_id = mapped_column(ForeignKey("acesso_ativo.id"), nullable=True)
+    local_instalacao_id = mapped_column(ForeignKey("local_instalacao.id"), nullable=True)
+
+    interno = mapped_column(Boolean, nullable=True)
+    periodicidade = mapped_column(Text, nullable=True)
+    data_instalacao = mapped_column(DateTime, nullable=True)
+
+    # novo vínculo 1:1 com estoque
+    stock_unit_id = mapped_column(ForeignKey("estoque.id", ondelete="SET NULL"), unique=True, nullable=True)
+
+    # novo serial textual, único por empresa
+    serial_text = mapped_column(Text, nullable=False)
+
+    criado_em = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=True)
+
+    # relationships (ajuste nomes conforme seu padrão):
+    empresa = relationship("Empresa")
     contrato = relationship("Contrato", back_populates="ativos")
     status = relationship("StatusAtivo", back_populates="ativos")
     tipo = relationship("TipoAtivo", back_populates="ativos")
     acesso = relationship("AcessoAtivo", back_populates="ativos")
     local_instalacao = relationship("LocalInstalacao", back_populates="ativos")
-    estoque_item = relationship("Estoque", foreign_keys=[serial], uselist=False)
-
+    estoque_item = relationship("Estoque", foreign_keys=[stock_unit_id], uselist=False)
 
 class TipoOS(Base):
     __tablename__ = "tipo_os"
@@ -213,9 +228,19 @@ class TipoOS(Base):
 
     ordens_servico = relationship("OrdemServico", back_populates="tipo")
 
+class OrdemServicoChamado(Base):
+    __tablename__ = "ordem_servico_chamado"
+    ordem_servico_id = mapped_column(ForeignKey("ordem_servico.id", ondelete="CASCADE"), primary_key=True)
+    chamado_id = mapped_column(ForeignKey("chamado.id", ondelete="CASCADE"), primary_key=True)
 
 class OrdemServico(Base):
     __tablename__ = "ordem_servico"
+    chamados = relationship(
+        "Chamado",
+        secondary="ordem_servico_chamado",
+        backref="ordens_servico_n_n",
+        lazy="selectin",
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     numero_os: Mapped[str | None] = mapped_column(Text, unique=True)
@@ -303,6 +328,9 @@ class CatalogoPeca(Base):
 
 class Estoque(Base):
     __tablename__ = "estoque"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "serial", name="uq_estoque_empresa_serial"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     catalogo_peca_id: Mapped[int] = mapped_column(ForeignKey("catalogo_peca.id"), nullable=False)
@@ -557,7 +585,7 @@ class ChamadoCategoria(Base):
 
 class Chamado(Base):
     __tablename__ = "chamado"
-
+    
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     numero: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))

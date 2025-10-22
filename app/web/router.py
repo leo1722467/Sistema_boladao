@@ -8,12 +8,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.services.auth import AuthService
-from app.core.config import settings
+from app.core.config import get_settings
 from app.api.auth import get_current_user_any
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory="app/web/templates")
+settings = get_settings()
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -46,7 +47,7 @@ async def login_form(request: Request, form_data: OAuth2PasswordRequestForm = De
         key="access_token",
         value=access,
         httponly=False,
-        max_age=settings.access_expires,
+        max_age=settings.ACCESS_EXPIRES_MIN * 60,
         path="/",
         samesite="lax",
         secure=False,
@@ -73,6 +74,30 @@ async def tables(request: Request, _: object = Depends(get_current_user_any)) ->
     """
 
     return templates.TemplateResponse("tables.html", {"request": request})
+
+
+@router.get("/assets", response_class=HTMLResponse)
+async def assets_page(request: Request) -> HTMLResponse:
+    """Render asset management page."""
+    return templates.TemplateResponse("assets.html", {"request": request})
+
+
+@router.get("/tickets", response_class=HTMLResponse)
+async def tickets_page(request: Request) -> HTMLResponse:
+    """Render ticket management page."""
+    return templates.TemplateResponse("tickets.html", {"request": request})
+
+
+@router.get("/service-orders", response_class=HTMLResponse)
+async def service_orders_page(request: Request) -> HTMLResponse:
+    """Render service order management page."""
+    return templates.TemplateResponse("service_orders.html", {"request": request})
+
+
+@router.get("/integrations", response_class=HTMLResponse)
+async def integrations_page(request: Request) -> HTMLResponse:
+    """Render integrations management page."""
+    return templates.TemplateResponse("integrations.html", {"request": request})
 
 
 @router.get("/web/logout")

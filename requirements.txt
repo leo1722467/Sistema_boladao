@@ -1,15 +1,69 @@
-now lets make a fluid interface like an slide to side to next step. This is interface will be for all system, but lets start with tickets "Chamados". I will provide the guide to each field:
-Numero: Auto assign and crescent  - automatic/dont appear
-Empresa: auto assign based on logged user. - automatic/dont appear
-Titulo: User will type, give a tip like "Câmera não funciona" - appear
-Descricao: User will type, give a tip like "Explique melhor sobre o problema" - appear
-Status: auto assign based on event, like if oppened = aberto, if answered = Em atendimento, etc... -  automati qc/dont appear
-Prioridade: auto assign based on "ativo" and the "problem", the logic will be implemented after. Just keep all with "Normal" - automatic/dont appear
-Ultima atualizacao: auto assign based in the time of the last modification, like answer, status change, etc... - automatic/dont appear
-Requisitante Contato: auto assign based on user wich openned the ticket - dont appear/automatic
-Agente Contato: auto assign based on user group, that will be implemented in future, just let "Admin" for default for now - dont appear/automatic
-Proprietario Contato:  auto assign based on user wich openned the ticket - dont appear/automatic - is duplicated its the same of Requisitante Contato
-Categoria: User will select from the avaible categories - appear
-Ativo: will list based on the previous choice, ativo has categoria, o the system will filter to show to user. - appear
-Fechado em: auto assign based when the technician will change status to "Fechado"
-Origem OS Pendencia: auto assign based on when the technician is performing a service and creating a work order, which will then generate a support ticket. - dont appear/automatic - future implement
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy[asyncio]==2.0.23
+alembic==1.12.1
+asyncpg==0.29.0
+aiosqlite==0.19.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+jinja2==3.1.2
+python-dotenv==1.0.0
+
+# Testing Dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-timeout==2.2.0
+httpx==0.25.2
+factory-boy==3.3.0
+
+# Caching and Performance
+redis==5.0.1
+aioredis==2.0.1
+
+# Security and Monitoring
+cryptography==41.0.7
+pyotp==2.9.0
+qrcode==7.4.2
+
+# HTTP Client for Integrations
+aiohttp==3.9.1
+requests==2.31.0
+
+# Data Processing
+pandas==2.1.4
+numpy==1.25.2
+
+# Email Support
+aiosmtplib==3.0.1
+email-validator==2.1.0
+
+# File Processing
+pillow==10.1.0
+python-magic==0.4.27
+
+# Monitoring and Logging
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# Development Tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.4.8
+
+# Optional: Production WSGI Server
+gunicorn==21.2.0
+
+# Optional: Message Queue
+celery==5.3.4
+kombu==5.3.4

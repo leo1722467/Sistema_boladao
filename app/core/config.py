@@ -1,46 +1,26 @@
-import logging
-from typing import Optional
-from pydantic import BaseSettings
-
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyUrl, Field
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables.
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    Attributes:
-        db_url: Database URL in SQLAlchemy format.
-        jwt_secret: Secret used to sign JWT tokens.
-        jwt_alg: Algorithm used for JWT.
-        access_expires: Access token expiry in seconds.
-        refresh_expires: Refresh token expiry in seconds.
-        app_port: Default application port for local runs.
-    """
+    ENV: str = Field(default="dev", description="dev|staging|prod")
+    APP_NAME: str = "Sistemao Bolado API"
+    APP_HOST: str = "0.0.0.0"
+    APP_PORT: int = 8081
 
-    db_url: str = "sqlite+aiosqlite:///./app.db"
-    jwt_secret: str = "change-me-in-env"
-    jwt_alg: str = "HS256"
-    access_expires: int = 900
-    refresh_expires: int = 86400
-    app_port: int = 8081
+    # Segurança
+    JWT_SECRET: str = "change-me"
+    ACCESS_EXPIRES_MIN: int = 30
+    REFRESH_EXPIRES_DAYS: int = 7
 
-    class Config:
-        env_prefix = "APP_"
-        case_sensitive = False
+    # DB
+    DB_URL: AnyUrl | str = "sqlite+aiosqlite:///./app.db"
 
+    # CORS
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
-settings = Settings()
-
-
-def configure_logging(level: int = logging.INFO) -> None:
-    """Configure application-wide logging.
-
-    Args:
-        level: Logging level to set.
-
-    Returns:
-        None
-    """
-
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

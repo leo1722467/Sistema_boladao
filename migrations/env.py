@@ -6,11 +6,12 @@ from sqlalchemy.engine import Connection
 from alembic import context
 from app.db.base import Base
 from app.db import models  # noqa: F401 - ensure models are imported for target_metadata
-from app.core.config import settings
+from app.core.config import get_settings
 from sqlalchemy.ext.asyncio import create_async_engine
 
 
 config = context.config
+settings = get_settings()
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -19,7 +20,7 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return str(settings.db_url)
+    return str(settings.DB_URL)
 
 
 def run_migrations_offline() -> None:

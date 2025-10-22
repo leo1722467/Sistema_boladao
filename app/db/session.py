@@ -2,9 +2,10 @@ from typing import AsyncGenerator
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from app.core.config import settings
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 def get_engine() -> object:
@@ -14,7 +15,7 @@ def get_engine() -> object:
         Async engine instance.
     """
 
-    engine = create_async_engine(str(settings.db_url), echo=False, poolclass=NullPool, future=True)
+    engine = create_async_engine(str(settings.DB_URL), echo=False, poolclass=NullPool, future=True)
     return engine
 
 
