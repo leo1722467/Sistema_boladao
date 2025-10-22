@@ -168,7 +168,10 @@ def create_app() -> FastAPI:
     # Startup initializers (migrations, cache)
     @app.on_event("startup")
     async def startup_event():
-        await initialize_database()
+        import os
+        run_migrations = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "false").lower() == "true"
+        if run_migrations:
+            await initialize_database()
         await initialize_cache()
 
     return app
@@ -178,3 +181,4 @@ app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host=settings.APP_HOST, port=settings.APP_PORT, reload=True)
+    # uvicorn.run("app.main:app", host=settings.APP_HOST, port=settings.APP_PORT, reload=False)

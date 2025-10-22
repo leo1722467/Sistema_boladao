@@ -80,78 +80,78 @@ def _read_coverage_xml(path: str) -> Optional[Dict[str, Any]]:
 
 
 @router.get("/test/coverage")
- @require_role(UserRole.ADMIN)
- async def get_test_coverage(auth_context: AuthorizationContext = Depends(get_authorization_context)) -> Dict[str, Any]:
-     """Return test coverage summary if available (from coverage.xml or htmlcov)."""
-     # Look for coverage.xml
-     cov_xml_path = os.path.join(os.getcwd(), "coverage.xml")
-     cov_html_index = os.path.join(os.getcwd(), "htmlcov", "index.html")
- 
-     summary = None
-     if os.path.exists(cov_xml_path):
-         summary = _read_coverage_xml(cov_xml_path)
- 
-     return {
-         "available": bool(summary) or os.path.exists(cov_html_index),
-         "summary": summary,
-         "html_report": os.path.exists(cov_html_index),
-     }
- 
- 
- @router.get("/deployment/status")
- @require_role(UserRole.ADMIN)
- async def get_deployment_status(auth_context: AuthorizationContext = Depends(get_authorization_context)) -> Dict[str, Any]:
-     """Report deployment readiness and environment checks."""
-     settings = get_settings()
- 
-     # Database readiness
-     db_ready = await check_database_ready()
-     migration_status = await db_manager.check_migration_status()
- 
-     # Cache readiness
-     cache_backend = "redis" if cache_manager.use_redis else "memory"
-     cache_ok = True
-     try:
-         if cache_manager.use_redis and cache_manager.redis_cache and cache_manager.redis_cache.redis_client:
-             cache_ok = await cache_manager.redis_cache.redis_client.ping()
-     except Exception:
-         cache_ok = False
- 
-     # CORS / Hosts
-     cors_origins = getattr(settings, "CORS_ORIGINS", []) or []
-     allowed_hosts = getattr(settings, "ALLOWED_HOSTS", ["*"])
- 
-     # SSL configured flag (heuristic)
-     ssl_configured = bool(os.environ.get("SSL_ENABLED", "false").lower() == "true")
- 
-     # Overall readiness (simple rule set)
-     readiness_ok = all([
-         db_ready,
-         cache_ok,
-         True,  # add more checks as needed
-     ])
- 
-     return {
-         "environment": {
-             "env": getattr(settings, "ENV", "dev"),
-             "app": getattr(settings, "APP_NAME", "Sistema Boladão"),
-             "version": getattr(settings, "APP_VERSION", "unknown"),
-         },
-         "database": {
-             "ready": db_ready,
-             "migration_status": migration_status,
-         },
-         "cache": {
-             "backend": cache_backend,
-             "ready": cache_ok,
-         },
-         "network": {
-             "cors_origins": cors_origins,
-             "allowed_hosts": allowed_hosts,
-             "ssl_configured": ssl_configured,
-         },
-         "readiness": {
-             "ok": readiness_ok,
-             "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
-         },
-     }
+@require_role(UserRole.ADMIN)
+async def get_test_coverage(auth_context: AuthorizationContext = Depends(get_authorization_context)) -> Dict[str, Any]:
+    """Return test coverage summary if available (from coverage.xml or htmlcov)."""
+    # Look for coverage.xml
+    cov_xml_path = os.path.join(os.getcwd(), "coverage.xml")
+    cov_html_index = os.path.join(os.getcwd(), "htmlcov", "index.html")
+
+    summary = None
+    if os.path.exists(cov_xml_path):
+        summary = _read_coverage_xml(cov_xml_path)
+
+    return {
+        "available": bool(summary) or os.path.exists(cov_html_index),
+        "summary": summary,
+        "html_report": os.path.exists(cov_html_index),
+    }
+
+
+@router.get("/deployment/status")
+@require_role(UserRole.ADMIN)
+async def get_deployment_status(auth_context: AuthorizationContext = Depends(get_authorization_context)) -> Dict[str, Any]:
+    """Report deployment readiness and environment checks."""
+    settings = get_settings()
+
+    # Database readiness
+    db_ready = await check_database_ready()
+    migration_status = await db_manager.check_migration_status()
+
+    # Cache readiness
+    cache_backend = "redis" if cache_manager.use_redis else "memory"
+    cache_ok = True
+    try:
+        if cache_manager.use_redis and cache_manager.redis_cache and cache_manager.redis_cache.redis_client:
+            cache_ok = await cache_manager.redis_cache.redis_client.ping()
+    except Exception:
+        cache_ok = False
+
+    # CORS / Hosts
+    cors_origins = getattr(settings, "CORS_ORIGINS", []) or []
+    allowed_hosts = getattr(settings, "ALLOWED_HOSTS", ["*"])
+
+    # SSL configured flag (heuristic)
+    ssl_configured = bool(os.environ.get("SSL_ENABLED", "false").lower() == "true")
+
+    # Overall readiness (simple rule set)
+    readiness_ok = all([
+        db_ready,
+        cache_ok,
+        True,  # add more checks as needed
+    ])
+
+    return {
+        "environment": {
+            "env": getattr(settings, "ENV", "dev"),
+            "app": getattr(settings, "APP_NAME", "Sistema Boladão"),
+            "version": getattr(settings, "APP_VERSION", "unknown"),
+        },
+        "database": {
+            "ready": db_ready,
+            "migration_status": migration_status,
+        },
+        "cache": {
+            "backend": cache_backend,
+            "ready": cache_ok,
+        },
+        "network": {
+            "cors_origins": cors_origins,
+            "allowed_hosts": allowed_hosts,
+            "ssl_configured": ssl_configured,
+        },
+        "readiness": {
+            "ok": readiness_ok,
+            "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+        },
+    }

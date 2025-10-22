@@ -28,3 +28,9 @@ def setup_logging(level: int = logging.INFO, log_file: str = "app-debug.log") ->
     logger.addHandler(stream_handler)
     if file_handler:
         logger.addHandler(file_handler)
+
+    # Suppress watchfiles noisy INFO logs
+    logging.getLogger("watchfiles").setLevel(logging.ERROR)
+    logging.getLogger("watchfiles.main").setLevel(logging.ERROR)
+    logging.getLogger("watchfiles").propagate = False
+    logging.getLogger("watchfiles.main").propagate = False
