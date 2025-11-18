@@ -22,19 +22,20 @@ class ContatoRepository:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def create(self, session: AsyncSession, nome: str, email: Optional[str]) -> Contato:
+    async def create(self, session: AsyncSession, nome: str, email: Optional[str], empresa_id: Optional[int] = None) -> Contato:
         """Create a new `Contato`.
 
         Args:
             session: Async database session.
             nome: Contact name.
             email: Contact email.
+            empresa_id: Optional Empresa ID to associate the contact with.
 
         Returns:
             Contato: Persisted entity.
         """
 
-        entity = Contato(nome=nome, email=email, ativo=True)
+        entity = Contato(nome=nome, email=email, ativo=True, empresa_id=empresa_id)
         session.add(entity)
         await session.flush()
         return entity

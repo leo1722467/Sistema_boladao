@@ -18,7 +18,14 @@ class AuthService:
         self.user_repo = UserAuthRepository()
         self.contato_repo = ContatoRepository()
 
-    async def register(self, session: AsyncSession, nome: str, email: str, password: str) -> UserAuth:
+    async def register(
+        self,
+        session: AsyncSession,
+        nome: str,
+        email: str,
+        password: str,
+        empresa_nome: Optional[str] = None,
+    ) -> UserAuth:
         """Register a new user and create associated entities.
 
         Args:
@@ -26,14 +33,27 @@ class AuthService:
             nome: Contact name.
             email: Login email.
             password: Plain password.
+            empresa_nome: Optional company name to create/associate with the contact.
 
         Returns:
             UserAuth: Created auth entity.
         """
+        # Optionally ensure Empresa exists and capture empresa_id for the contact
+        empresa_id: Optional[int] = None
+        if empresa_nome:
+            from sqlalchemy import select
+            from app.db.models import Empresa
+            res = await session.execute(select(Empresa).where(Empresa.nome == empresa_nome))
+            empresa = res.scalar_one_or_none()
+            if not empresa:
+                empresa = Empresa(nome=empresa_nome)
+                session.add(empresa)
+                await session.flush()
+            empresa_id = empresa.id
 
         existing_contato = await self.contato_repo.get_by_email(session, email)
         if existing_contato is None:
-            existing_contato = await self.contato_repo.create(session, nome=nome, email=email)
+            existing_contato = await self.contato_repo.create(session, nome=nome, email=email, empresa_id=empresa_id)
 
         existing_auth = await self.user_repo.get_by_email(session, email)
         if existing_auth:

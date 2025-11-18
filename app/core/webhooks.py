@@ -218,7 +218,7 @@ class WebhookWorker:
             "aggregate_type": event.aggregate_type,
             "aggregate_id": event.aggregate_id,
             "payload": event.payload,
-            "metadata": event.metadata or {},
+            "metadata": event.event_metadata or {},
             "timestamp": event.created_at.isoformat(),
             "empresa_id": event.empresa_id
         }

@@ -451,3 +451,8 @@ class OrdemServicoService:
                 
         except Exception as e:
             logger.error(f"Error logging activity for service order {service_order_id}: {e}")
+
+# Backwards-compatibility alias for tests and external imports
+# Some test modules expect `ServiceOrderService` in this module
+# Provide an alias to the enhanced OrdemServicoService implementation
+ServiceOrderService = OrdemServicoService

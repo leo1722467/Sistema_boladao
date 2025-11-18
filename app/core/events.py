@@ -164,7 +164,7 @@ class EventDispatcher:
                 aggregate_type=event.aggregate_type,
                 aggregate_id=event.aggregate_id,
                 payload=event.payload,
-                metadata=event.metadata or {},
+                event_metadata=event.metadata or {},
                 empresa_id=event.empresa_id,
                 status=EventStatus.PENDING
             )

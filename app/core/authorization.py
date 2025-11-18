@@ -15,7 +15,10 @@ from app.api.auth import get_current_user
 from app.core.tenant import get_tenant_context, TenantContext
 from app.db.models import UserAuth, Contato
 from app.core.exceptions import TenantScopeError, ValidationError
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Security
 
+bearer_scheme = HTTPBearer(auto_error=False)
 logger = logging.getLogger(__name__)
 
 
@@ -148,28 +151,27 @@ async def get_user_role(session: AsyncSession, user: UserAuth) -> UserRole:
         return UserRole.VIEWER
 
 
+
 async def get_authorization_context(
+    # 👇 novo parâmetro só para declarar o esquema no OpenAPI/Swagger
+    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+
     session: AsyncSession = Depends(get_db),
-    user: UserAuth = Depends(get_current_user),
+    user: UserAuth = Depends(get_current_user),   # mantém seu fluxo atual
     tenant: TenantContext = Depends(get_tenant_context),
 ) -> AuthorizationContext:
-    """Get the complete authorization context for the current user."""
+    if not credentials or not credentials.credentials:
+        # Sem token → 401 (Swagger agora injeta o header ao clicar em "Authorize")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     try:
         role = await get_user_role(session, user)
         permissions = ROLE_PERMISSIONS.get(role, [])
-        
-        return AuthorizationContext(
-            user=user,
-            tenant=tenant,
-            role=role,
-            permissions=permissions
-        )
+        return AuthorizationContext(user=user, tenant=tenant, role=role, permissions=permissions)
     except Exception as e:
         logger.error(f"Error creating authorization context: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to determine user authorization"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Failed to determine user authorization")
 
 
 def require_permission(permission: Permission):

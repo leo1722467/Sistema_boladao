@@ -508,7 +508,7 @@ async def get_ticket_analytics(
         logger.exception(f"Unexpected error getting analytics: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while generating analytics"
+            detail=f"An unexpected error occurred while generating analytics: {e}"
         )
 
 
@@ -897,7 +897,7 @@ async def get_service_order_analytics(
         logger.exception(f"Unexpected error getting service order analytics: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while generating analytics"
+            detail=f"An unexpected error occurred while generating analytics: {e}"
         )
 
 

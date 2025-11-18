@@ -76,7 +76,9 @@ class OutboxEvent(Base):
     
     # Event data
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=True)
+    # NOTE: 'metadata' is a reserved attribute in SQLAlchemy Declarative
+    # Rename to avoid collision with Base.metadata
+    event_metadata: Mapped[dict] = mapped_column(JSON, nullable=True)
     
     # Processing status
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=EventStatus.PENDING, index=True)
