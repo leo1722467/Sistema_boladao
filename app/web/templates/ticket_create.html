@@ -26,7 +26,15 @@
     .container { padding: 0; max-width: none; }
     .game-slider { position: relative; width: calc(100vw - 280px); height: calc(100vh - 64px); overflow: hidden; }
     .slides { display: flex; width: calc(100%); height: 100%; transition: transform 0.5s ease-in-out; }
-    .slide { flex: 0 0 100%; display: grid; grid-template-columns: 1fr; gap: 24px; padding: 0; align-content: stretch; font-size: 24px; font-weight: bold; }
+    .slide { flex: 0 0 100%; display: flex; flex-direction: column; gap: 24px; padding: 0; align-content: stretch; font-size: 24px; font-weight: bold; height: 100%;}
+    .slide-title {
+    font-size: 28px;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 16px;
+    color: #fff;
+}
+
     .square { border-radius: 20px; padding: 20px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
     .sq-blue { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
     .sq-green { background: linear-gradient(135deg, #166534, #22c55e); }
@@ -35,8 +43,7 @@
     .sq-pink { background: linear-gradient(135deg, #9d174d, #ec4899); }
     .sq-slate { background: linear-gradient(135deg, #1f2937, #64748b); }
     .square h3 { font-size: 24px; font-weight: 800; margin-bottom: 12px; color: #fff; text-align: center; }
-    .input, .select, .textarea { width: 100%; height: 100%; padding: 10px 12px; border: none; border-radius: 10px; font-size: 14px; background: rgba(255,255,255,0.12); color: #fff; text-align: center; }
-    .textarea { min-height: 120px; }
+    .input, .select, .textarea { width: 100%; height: auto; padding: 10px 12px; border: none; border-radius: 10px; font-size: 14px; background: rgba(255,255,255,0.12); color: #fff; text-align: center; }
     .side-controls { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; }
     .side-left { left: 0; }
     .side-right { right: 0; }
@@ -49,12 +56,12 @@
     .dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.25); cursor: pointer; }
     .dot.active { background: #3b82f6; }
     .empty-state { text-align: center; padding: 40px 20px; color: #e2e8f0; }
-    .center-step { display: flex; align-items: stretch; justify-content: center; height: 100%; font-size: 24px; font-weight: bold; }
+    .center-step {display: flex; flex: 1; align-items: stretch; justify-content: center; flex: 1; display: flex;}
+
     .center-box { width: 100%; max-width: none; height: 100%; display: flex; }
     .square { height: 100%; width: 100%; display: flex; flex-direction: column; flex: 1; }
-    .input, .select, .textarea { width: 100%; }
     .textarea { flex: 1; resize: none; }
-    .options-grid { display: grid; gap: 20px; height: 100%; align-content: stretch; }
+    .options-grid { display: grid; gap: 20px; height: 100%; align-content: stretch; grid-auto-rows: 1fr; }
     .option-btn { display: flex; align-items: center; justify-content: center; padding: 24px; border-radius: 16px; background: rgba(255,255,255,0.12); color: #fff; font-weight: 600; cursor: pointer; border: 2px solid transparent; height: 100%; }
     .option-btn.active { border-color: #3b82f6; }
   </style>
@@ -88,13 +95,13 @@
     <div class="container">
       <div class="game-slider">
         <div id="slides" class="slides">
-          <div class="slide"><div class="center-step"><div class="center-box"><div class="square sq-blue"><h3>Título</h3><input id="tituloInput" class="input" placeholder="Como podemos nomear este chamado?" /></div></div></div></div>
-          <div class="slide"><div class="center-step"><div class="center-box"><div class="square sq-green"><h3>Descrição</h3><textarea id="descricaoInput" class="textarea" placeholder="Conte os detalhes, sintomas, contexto"></textarea></div></div></div></div>
+          <div class="slide"><h3 class="slide-title">Título</h3><div class="center-step"><div class="center-box"><div class="square sq-blue"><input id="tituloInput" class="input" placeholder="Como podemos nomear este chamado?" /></div></div></div></div>
+          <div class="slide"><h3 class="slide-title">Descrição</h3><div class="center-step"><div class="center-box"><div class="square sq-green"><textarea id="descricaoInput" class="textarea" placeholder="Conte os detalhes, sintomas, contexto"></textarea></div></div></div></div>
           <div class="slide"><div class="center-step">Prioridade</div><div class="options-grid" id="priorityGrid"></div></div>
           <div class="slide"><div class="center-step">Categoria</div><div class="options-grid" id="categoryGrid"></div></div>
           <div class="slide"><div class="center-step">Agente</div><div class="options-grid" id="agentGrid"></div></div>
-          <div class="slide"><div class="grid-title">Proprietário</div><div class="options-grid" id="ownerGrid"></div></div>
-          <div class="slide"><div class="grid-title">Ativo</div><div class="options-grid" id="assetGrid"></div></div>
+          <div class="slide"><div class="center-step">Proprietário</div><div class="options-grid" id="ownerGrid"></div></div>
+          <div class="slide"><div class="center-step">Ativo</div><div class="options-grid" id="assetGrid"></div></div>
           <div class="slide"><div class="square sq-blue" style="height:100%;"><h3 style="margin-bottom:16px;">Resumo</h3><div id="summaryBox" class="empty-state" style="padding: 0; text-align: left;"></div><div style="margin-top:20px;"><button id="createTicketBtn" class="btn btn-primary"><i class="fas fa-gamepad"></i> Criar Chamado</button></div></div></div>
         </div>
         <div class="side-controls side-left"><button id="prevBtn" class="side-btn"><i class="fas fa-chevron-left"></i></button></div>
@@ -148,7 +155,7 @@
         prOpts = prRes.ok ? await prRes.json() : []
         const ctRes = await fetch('/admin/Contato/items', { credentials: 'include', headers })
         ctOpts = ctRes.ok ? await ctRes.json() : []
-        const catRes = await fetch('/admin/chamado/foreign-key-options/categoria_id', { credentials: 'include', headers })
+        const catRes = await fetch('/admin/ChamadoCategoria/items', { credentials: 'include', headers })
         catOpts = catRes.ok ? await catRes.json() : []
         const atRes = await fetch('/admin/Ativo/items', { credentials: 'include', headers })
         atOpts = atRes.ok ? await atRes.json() : []
@@ -178,11 +185,19 @@
       const aGrid = document.getElementById('agentGrid')
       const oGrid = document.getElementById('ownerGrid')
       const sGrid = document.getElementById('assetGrid')
-      pGrid.innerHTML = prOpts.map(o => `<div class="option-btn ${selectedPriorityId===o.id?'active':''}" onclick="selectPriority(${o.id})">${o.nome}</div>`).join('')
-      cGrid.innerHTML = catOpts.map(o => `<div class="option-btn ${selectedCategoryId===o.id?'active':''}" onclick="selectCategory(${o.id})">${o.nome || 'Categoria'} #${o.id}</div>`).join('')
-      aGrid.innerHTML = ctOpts.map(o => `<div class="option-btn ${selectedAgentId===o.id?'active':''}" onclick="selectAgent(${o.id})">${o.nome || o.email || 'Contato'} #${o.id}</div>`).join('')
-      oGrid.innerHTML = ctOpts.map(o => `<div class="option-btn ${selectedOwnerId===o.id?'active':''}" onclick="selectOwner(${o.id})">${o.nome || o.email || 'Contato'} #${o.id}</div>`).join('')
-      sGrid.innerHTML = atOpts.map(o => `<div class="option-btn ${selectedAssetId===o.id?'active':''}" onclick="selectAsset(${o.id})">${o.tag || o.descricao || 'Ativo'} #${o.id}</div>`).join('')
+      const randomGradient = () => { const h = Math.floor(Math.random()*360); const c1 = `hsl(${h}, 70%, 45%)`; const c2 = `hsl(${(h+20)%360}, 70%, 55%)`; return `linear-gradient(135deg, ${c1}, ${c2})` }
+      const getCategoryBackground = (o) => {
+        const isActive = o && (o.ativo === true || o.ativo === 1 || o.ativo === 'true')
+        if (isActive && o && o.cor) {
+          return `linear-gradient(135deg, ${o.cor}, ${o.cor})`
+        }
+        return randomGradient()
+      }
+      pGrid.innerHTML = prOpts.map(o => { const bg = randomGradient(); return `<div class="option-btn ${selectedPriorityId===o.id?'active':''}" onclick="selectPriority(${o.id})" style="background:${bg}">${o.nome}</div>` }).join('')
+      cGrid.innerHTML = catOpts.map(o => { const bg = getCategoryBackground(o); return `<div class=\"option-btn ${selectedCategoryId===o.id?'active':''}\" onclick=\"selectCategory(${o.id})\" style=\"background:${bg}\">${o.nome || o.descricao || 'Categoria'} #${o.id}</div>` }).join('')
+      aGrid.innerHTML = ctOpts.map(o => { const bg = randomGradient(); return `<div class="option-btn ${selectedAgentId===o.id?'active':''}" onclick="selectAgent(${o.id})" style="background:${bg}">${o.nome || o.email || 'Contato'} #${o.id}</div>` }).join('')
+      oGrid.innerHTML = ctOpts.map(o => { const bg = randomGradient(); return `<div class="option-btn ${selectedOwnerId===o.id?'active':''}" onclick="selectOwner(${o.id})" style="background:${bg}">${o.nome || o.email || 'Contato'} #${o.id}</div>` }).join('')
+      sGrid.innerHTML = atOpts.map(o => { const bg = randomGradient(); return `<div class="option-btn ${selectedAssetId===o.id?'active':''}" onclick="selectAsset(${o.id})" style="background:${bg}">${o.tag || o.descricao || 'Ativo'} #${o.id}</div>` }).join('')
       const setGrid = (grid, count) => {
         const cols = Math.ceil(Math.sqrt(Math.max(count,1)))
         const rows = Math.ceil(count / cols)
