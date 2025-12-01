@@ -34,7 +34,7 @@ class EventPublishRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(None, description="Optional event metadata")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "event_type": "ticket.created",
                 "aggregate_type": "ticket",
@@ -59,7 +59,7 @@ class WebhookEndpointRequest(BaseModel):
     max_retries: int = Field(3, ge=0, le=10, description="Maximum retry attempts")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "name": "External CRM Integration",
                 "url": "https://api.example.com/webhooks/sistema-boladao",
@@ -77,7 +77,7 @@ class WhatsAppMessageRequest(BaseModel):
     message: str = Field(..., description="Message text to send")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "phone_number": "+5511999999999",
                 "message": "Olá! Seu chamado foi atualizado."
@@ -91,7 +91,7 @@ class AIAnalysisRequest(BaseModel):
     analysis_type: str = Field(..., description="Type of analysis to perform")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "text": "Meu computador está muito lento e travando constantemente",
                 "analysis_type": "ticket_classification"

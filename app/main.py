@@ -3,13 +3,10 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.middleware import (
     AuthenticationMiddleware,
-    RequestIDMiddleware,
-    SecurityHeadersMiddleware,
 )
 from app.core.database import initialize_database
 from app.core.cache import initialize_cache
@@ -104,25 +101,11 @@ def create_app() -> FastAPI:
         ]
     )
 
-    # Global request/response logging and exception capture
-    @app.middleware("http")
-    async def log_requests(request: Request, call_next):
-        logger = logging.getLogger("app.http")
-        logger.info("%s %s", request.method, request.url.path)
-        try:
-            response = await call_next(request)
-            logger.info("%s %s -> %s", request.method, request.url.path, response.status_code)
-            return response
-        except Exception:
-            logging.getLogger("app.errors").exception("Unhandled exception for %s %s", request.method, request.url.path)
-            raise
+    
 
-    # Trusted hosts (ajuste para seu domínio em prod)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+    
 
-    # Request ID + Security headers
-    app.add_middleware(RequestIDMiddleware)
-    app.add_middleware(SecurityHeadersMiddleware)
+    
 
     # Security hardening (rate limiting, vulnerability scanning)
     app.add_middleware(
@@ -168,10 +151,7 @@ def create_app() -> FastAPI:
     # Startup initializers (migrations, cache)
     @app.on_event("startup")
     async def startup_event():
-        import os
-        run_migrations = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "false").lower() == "true"
-        if run_migrations:
-            await initialize_database()
+        await initialize_database()
         await initialize_cache()
 
     return app

@@ -980,6 +980,11 @@
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', function() {
+      const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='));
+      if (!hasToken) {
+        window.location.href = '/';
+        return;
+      }
       initializeEventListeners();
       loadTicketStats();
       loadTickets();
@@ -1021,10 +1026,21 @@
 
     async function loadTicketStats() {
       try {
-        const response = await fetch('/api/helpdesk/analytics');
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch('/api/helpdesk/analytics', { credentials: 'include', headers });
         
         if (!response.ok) {
-          throw new Error('Erro ao carregar estatísticas');
+          let msg = 'Erro ao carregar estatísticas';
+          try {
+            const err = await response.json();
+            if (response.status === 401) msg = 'Sessão expirada. Faça login novamente.';
+            else if (response.status === 403) msg = 'Sem permissão para visualizar estatísticas.';
+            else if (response.status === 400) msg = err.detail || 'Usuário sem empresa associada.';
+            else if (response.status >= 500) msg = 'Erro interno do servidor.';
+          } catch {}
+          throw new Error(msg);
         }
         
         const data = await response.json();
@@ -1062,10 +1078,21 @@
         if (agent) params.append('agent', agent);
         if (sla) params.append('sla', sla);
         
-        const response = await fetch(`/api/helpdesk/tickets?${params}`);
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch(`/api/helpdesk/tickets?${params}`, { credentials: 'include', headers });
         
         if (!response.ok) {
-          throw new Error('Erro ao carregar chamados');
+          let msg = 'Erro ao carregar chamados';
+          try {
+            const err = await response.json();
+            if (response.status === 401) msg = 'Sessão expirada. Faça login novamente.';
+            else if (response.status === 403) msg = 'Sem permissão para visualizar chamados.';
+            else if (response.status === 400) msg = err.detail || 'Usuário sem empresa associada.';
+            else if (response.status >= 500) msg = 'Erro interno do servidor.';
+          } catch {}
+          throw new Error(msg);
         }
         
         const data = await response.json();
@@ -1315,10 +1342,21 @@
 
     async function viewTicket(id) {
       try {
-        const response = await fetch(`/api/helpdesk/tickets/${id}`);
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch(`/api/helpdesk/tickets/${id}`, { credentials: 'include', headers });
         
         if (!response.ok) {
-          throw new Error('Erro ao carregar chamado');
+          let msg = 'Erro ao carregar chamado';
+          try {
+            const err = await response.json();
+            if (response.status === 401) msg = 'Sessão expirada. Faça login novamente.';
+            else if (response.status === 403) msg = 'Sem permissão para visualizar chamado.';
+            else if (response.status === 404) msg = err.detail || 'Chamado não encontrado.';
+            else if (response.status >= 500) msg = 'Erro interno do servidor.';
+          } catch {}
+          throw new Error(msg);
         }
         
         const ticket = await response.json();

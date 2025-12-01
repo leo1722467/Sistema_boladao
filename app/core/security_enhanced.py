@@ -4,6 +4,7 @@ Provides rate limiting, security monitoring, vulnerability scanning, and threat 
 """
 
 import logging
+import uuid
 import asyncio
 import hashlib
 import secrets
@@ -22,6 +23,7 @@ from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
 
+REQUEST_ID_HEADER = "X-Request-ID"
 
 @dataclass
 class SecurityEvent:
@@ -309,6 +311,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         """Process request through security layers."""
         start_time = datetime.utcnow()
+        request_id = request.headers.get(REQUEST_ID_HEADER, str(uuid.uuid4()))
         client_ip = self.get_client_ip(request)
         
         # Check if IP is blocked
@@ -362,6 +365,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         # Process request
         try:
             response = await call_next(request)
+            response.headers.setdefault("X-Content-Type-Options", "nosniff")
+            response.headers.setdefault("X-Frame-Options", "DENY")
+            response.headers.setdefault("Referrer-Policy", "no-referrer")
+            response.headers.setdefault("X-XSS-Protection", "0")
+            response.headers[REQUEST_ID_HEADER] = request_id
             
             # Log successful request
             duration = (datetime.utcnow() - start_time).total_seconds()

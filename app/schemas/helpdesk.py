@@ -42,7 +42,7 @@ class InventoryIntakeRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "catalogo_peca_id": 1,
                 "serial": "SN123456789",
@@ -73,7 +73,7 @@ class InventoryIntakeResponse(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "estoque_id": 123,
                 "asset_id": 456,
@@ -82,14 +82,24 @@ class InventoryIntakeResponse(BaseModel):
         }
 
 
+class NamedEntity(BaseModel):
+    """Minimal entity carrying id and nome for UI rendering."""
+    id: Optional[int] = Field(None, description="Entity ID", example=1)
+    nome: Optional[str] = Field(None, description="Entity display name", example="Notebook")
+
+
 class AssetSummary(BaseModel):
     """Summary model for asset information."""
     
     id: int = Field(..., description="Asset ID", example=123)
-    serial_text: str = Field(..., description="Asset serial number", example="EMP-1-1698765432000-1234-ATIVO")
+    serial_text: Optional[str] = Field(None, description="Asset serial number", example="EMP-1-1698765432000-1234-ATIVO")
     descricao: Optional[str] = Field(None, description="Asset description", example="Laptop Dell Inspiron")
     tag: Optional[str] = Field(None, description="Asset tag", example="TAG-001")
     criado_em: Optional[str] = Field(None, description="Creation timestamp (ISO format)", example="2023-10-31T10:30:00")
+    # lightweight nested relations so web UI can render names
+    tipo: NamedEntity | None = Field(None, description="Asset type (id and nome)")
+    status: NamedEntity | None = Field(None, description="Asset status (id and nome)")
+    local_instalacao: NamedEntity | None = Field(None, description="Installation location (id and nome)")
 
 
 class CreateTicketRequest(BaseModel):
@@ -105,11 +115,27 @@ class CreateTicketRequest(BaseModel):
         description="Detailed description of the issue",
         example="The laptop won't turn on when pressing the power button. No lights or sounds."
     )
+    # Textual aliases for UI flexibility
+    prioridade: Optional[str] = Field(
+        None,
+        description="Priority (text alias)",
+        example="normal"
+    )
+    priority: Optional[str] = Field(
+        None,
+        description="Priority (ui alias)",
+        example="normal"
+    )
     prioridade_id: Optional[int] = Field(
         None,
         gt=0,
         description="Priority ID (uses default if not provided)",
         example=2
+    )
+    status: Optional[str] = Field(
+        None,
+        description="Status (text alias)",
+        example="open"
     )
     status_id: Optional[int] = Field(
         None,
@@ -148,11 +174,11 @@ class CreateTicketRequest(BaseModel):
         return v.strip()
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "titulo": "Laptop not turning on",
                 "descricao": "The laptop won't turn on when pressing the power button. No lights or sounds.",
-                "prioridade_id": 2,
+                "prioridade": "normal",
                 "categoria_id": 3,
                 "ativo_id": 456
             }
@@ -167,7 +193,7 @@ class CreateTicketResponse(BaseModel):
     ativo_id: Optional[int] = Field(None, description="Linked asset ID", example=456)
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 789,
                 "numero": "TKT-2023-001234",
@@ -208,7 +234,7 @@ class CreateServiceOrderRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "chamado_id": 789,
                 "tipo_os_id": 1,
@@ -227,7 +253,7 @@ class CreateServiceOrderResponse(BaseModel):
     numero_os: Optional[str] = Field(None, description="Service order number", example="OS-2023-001234")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 321,
                 "chamado_id": 789,
@@ -244,7 +270,7 @@ class ErrorResponse(BaseModel):
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "message": "Catalog item with ID 999 not found",
                 "type": "not_found",
@@ -260,7 +286,7 @@ class SuccessResponse(BaseModel):
     data: Optional[Dict[str, Any]] = Field(None, description="Additional response data")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "message": "Operation completed successfully",
                 "data": {"processed_items": 5}
@@ -276,37 +302,39 @@ class TicketDetailResponse(BaseModel):
     titulo: str = Field(..., description="Ticket title", example="Laptop not turning on")
     descricao: Optional[str] = Field(None, description="Ticket description")
     status: Optional[str] = Field(None, description="Current status", example="open")
-    prioridade: Optional[str] = Field(None, description="Priority level", example="high")
+    prioridade: Optional[str] = Field(None, description="Priority level (legacy)", example="high")
+    priority: Optional[str] = Field(None, description="Priority level (ui alias)", example="high")
     categoria: Optional[str] = Field(None, description="Ticket category", example="hardware")
     ativo_id: Optional[int] = Field(None, description="Linked asset ID", example=456)
-    requisitante: Optional[str] = Field(None, description="Requester name", example="João Silva")
-    agente: Optional[str] = Field(None, description="Assigned agent name", example="Maria Santos")
+    requisitante: NamedEntity | None = Field(None, description="Requester (id, nome)")
+    agente: NamedEntity | None = Field(None, description="Assigned agent (id, nome)")
     criado_em: str = Field(..., description="Creation timestamp", example="2023-10-31T10:30:00")
     atualizado_em: str = Field(..., description="Last update timestamp", example="2023-10-31T15:45:00")
     fechado_em: Optional[str] = Field(None, description="Closure timestamp")
-    sla_status: Optional[Dict[str, Any]] = Field(None, description="SLA breach information")
+    sla_status: Optional[str] = Field(None, description="SLA indicator (ok, warning, breach)")
     next_actions: Optional[List[Dict[str, str]]] = Field(None, description="Suggested next actions")
 
     class Config:
-        schema_extra = {
-            "example": {
-                "id": 789,
-                "numero": "TKT-2023-001234",
-                "titulo": "Laptop not turning on",
-                "descricao": "The laptop won't turn on when pressing the power button",
-                "status": "open",
-                "prioridade": "high",
-                "categoria": "hardware",
-                "ativo_id": 456,
-                "requisitante": "João Silva",
-                "agente": "Maria Santos",
-                "criado_em": "2023-10-31T10:30:00",
-                "atualizado_em": "2023-10-31T15:45:00",
-                "fechado_em": None,
-                "sla_status": {"response_breach": False, "resolution_breach": True},
-                "next_actions": [{"action": "transition_to_in_progress", "description": "Start working on ticket"}]
-            }
+        json_schema_extra = {
+        "example": {
+            "id": 789,
+            "numero": "TKT-2023-001234",
+            "titulo": "Laptop not turning on",
+            "descricao": "The laptop won't turn on when pressing the power button",
+            "status": "open",
+            "prioridade": "high",
+            "priority": "high",
+            "categoria": "hardware",
+            "ativo_id": 456,
+            "requisitante": {"id": 12, "nome": "João Silva"},
+            "agente": {"id": 34, "nome": "Maria Santos"},
+            "criado_em": "2023-10-31T10:30:00",
+            "atualizado_em": "2023-10-31T15:45:00",
+            "fechado_em": None,
+            "sla_status": "warning",
+            "next_actions": [{"action": "transition_to_in_progress", "description": "Start working on ticket"}]
         }
+    }
 
 
 class UpdateTicketRequest(BaseModel):
@@ -322,11 +350,21 @@ class UpdateTicketRequest(BaseModel):
         description="Updated ticket description",
         example="After diagnosis, determined that motherboard needs replacement"
     )
+    status: Optional[str] = Field(
+        None,
+        description="New status (text)",
+        example="in_progress"
+    )
     status_id: Optional[int] = Field(
         None,
         gt=0,
         description="New status ID",
         example=3
+    )
+    priority: Optional[str] = Field(
+        None,
+        description="New priority (text)",
+        example="high"
     )
     prioridade_id: Optional[int] = Field(
         None,
@@ -353,7 +391,7 @@ class UpdateTicketRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "status_id": 3,
                 "agente_contato_id": 15,
@@ -380,7 +418,7 @@ class TicketFilters(BaseModel):
     offset: Optional[int] = Field(0, ge=0, description="Number of results to skip")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "status_id": 1,
                 "search": "laptop",
@@ -397,25 +435,29 @@ class TicketListResponse(BaseModel):
     total: int = Field(..., description="Total number of tickets matching filters")
     limit: int = Field(..., description="Applied limit")
     offset: int = Field(..., description="Applied offset")
+    page: Optional[int] = Field(None, description="Current page number")
+    total_pages: Optional[int] = Field(None, description="Total pages based on total and limit")
 
     class Config:
         schema_extra = {
-            "example": {
-                "tickets": [
-                    {
-                        "id": 789,
-                        "numero": "TKT-2023-001234",
-                        "titulo": "Laptop not turning on",
-                        "status": "open",
-                        "prioridade": "high",
-                        "criado_em": "2023-10-31T10:30:00"
-                    }
-                ],
-                "total": 1,
-                "limit": 100,
-                "offset": 0
-            }
+        "example": {
+            "tickets": [
+                {
+                    "id": 789,
+                    "numero": "TKT-2023-001234",
+                    "titulo": "Laptop not turning on",
+                    "status": "open",
+                    "priority": "high",
+                    "criado_em": "2023-10-31T10:30:00"
+                }
+            ],
+            "total": 1,
+            "limit": 100,
+            "offset": 0,
+            "page": 1,
+            "total_pages": 1
         }
+    }
 
 
 class TicketAnalyticsResponse(BaseModel):
@@ -611,6 +653,8 @@ class ServiceOrderListResponse(BaseModel):
     total: int = Field(..., description="Total number of service orders matching filters")
     limit: int = Field(..., description="Applied limit")
     offset: int = Field(..., description="Applied offset")
+    page: Optional[int] = Field(None, description="Current page number")
+    total_pages: Optional[int] = Field(None, description="Total pages based on total and limit")
 
     class Config:
         schema_extra = {
@@ -626,7 +670,9 @@ class ServiceOrderListResponse(BaseModel):
                 ],
                 "total": 1,
                 "limit": 100,
-                "offset": 0
+                "offset": 0,
+                "page": 1,
+                "total_pages": 1
             }
         }
 

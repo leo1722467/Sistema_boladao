@@ -6,6 +6,7 @@ import time
 import random
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
 
 from app.repositories.chamado import ChamadoRepository
 from app.db.models import Chamado, StatusChamado, Prioridade, ChamadoComentario, ChamadoLog
@@ -81,9 +82,9 @@ class TicketService:
                         {"ativo_id": ativo_id, "empresa_id": empresa_id}
                     )
             
-            # Set default status to 'new' if not provided
+            # Set default status to 'open' (Aberto) if not provided
             if not status_id:
-                new_status = await self._get_default_status(session, "new")
+                new_status = await self._get_default_status(session, "open")
                 status_id = new_status.id if new_status else None
             
             # Generate unique ticket number
@@ -144,7 +145,12 @@ class TicketService:
             ErrorHandler.validate_positive_integer(empresa_id, "empresa_id")
             ErrorHandler.validate_positive_integer(ticket_id, "ticket_id")
             
-            ticket = await self.repo.get_by_id(session, empresa_id, ticket_id)
+            # Empresa 1 (atendente) pode visualizar qualquer ticket
+            ticket = await (
+                self.repo.get_by_id_global(session, ticket_id)
+                if empresa_id == 1 else
+                self.repo.get_by_id(session, empresa_id, ticket_id)
+            )
             
             if ticket and include_relations:
                 # Load related data if needed
@@ -283,8 +289,20 @@ class TicketService:
         try:
             ErrorHandler.validate_positive_integer(empresa_id, "empresa_id")
             
-            # Build query with filters
-            query = select(Chamado).where(Chamado.empresa_id == empresa_id)
+            # Build query with filters and eager loading of relations
+            query = (
+                select(Chamado)
+                .options(
+                    selectinload(Chamado.status),
+                    selectinload(Chamado.prioridade),
+                    selectinload(Chamado.categoria),
+                    selectinload(Chamado.requisitante),
+                    selectinload(Chamado.agente),
+                    selectinload(Chamado.comentarios),
+                )
+            )
+            if empresa_id != 1:
+                query = query.where(Chamado.empresa_id == empresa_id)
             
             if filters:
                 if "status_id" in filters:

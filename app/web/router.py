@@ -100,6 +100,12 @@ async def integrations_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("integrations.html", {"request": request})
 
 
+@router.get("/inventory", response_class=HTMLResponse)
+async def inventory_page(request: Request) -> HTMLResponse:
+    """Render inventory management page."""
+    return templates.TemplateResponse("inventory.html", {"request": request})
+
+
 @router.get("/web/logout")
 async def logout() -> RedirectResponse:
     """Clear auth cookie and redirect to home.
@@ -111,3 +117,7 @@ async def logout() -> RedirectResponse:
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(key="access_token", path="/")
     return response
+@router.get("/tickets/new", response_class=HTMLResponse)
+async def ticket_create_page(request: Request) -> HTMLResponse:
+    """Render new ticket creation page."""
+    return templates.TemplateResponse("ticket_create.html", {"request": request})

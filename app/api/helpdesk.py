@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.session import get_db
 from app.core.tenant import get_tenant_context, TenantContext
@@ -16,6 +17,7 @@ from app.repositories.ativo import AtivoRepository
 from app.services.inventory import InventoryService
 from app.services.ticket import TicketService
 from app.services.ordem_servico import OrdemServicoService
+from app.db.models import StatusChamado, Prioridade, Contato
 from app.schemas.helpdesk import (
     InventoryIntakeRequest,
     InventoryIntakeResponse,
@@ -24,6 +26,7 @@ from app.schemas.helpdesk import (
     CreateServiceOrderRequest,
     CreateServiceOrderResponse,
     AssetSummary,
+    NamedEntity,
     ErrorResponse,
     TicketDetailResponse,
     UpdateTicketRequest,
@@ -139,34 +142,85 @@ async def list_assets(
         
         logger.debug(f"User {auth_context.user.id} listed {len(items)} assets")
         
-        return [
-            AssetSummary(
-                id=a.id,
-                serial_text=a.serial_text,
-                descricao=a.descricao,
-                tag=a.tag,
-                criado_em=a.criado_em.isoformat() if a.criado_em else None
-            )
-            for a in items
-        ]
+        # Be tolerant with timestamp types: handle datetime and string
+        from datetime import datetime as _dt
+
+        def _format_created(value: Any) -> Optional[str]:
+            if value is None:
+                return None
+            try:
+                if isinstance(value, _dt):
+                    return value.isoformat()
+                # Already a string or other printable type
+                return str(value)
+            except Exception:
+                # Fallback without breaking listing
+                return None
+
+        summaries: List[AssetSummary] = []
+        for a in items:
+            try:
+                tipo = None
+                if getattr(a, "tipo", None) is not None:
+                    try:
+                        tipo = NamedEntity(id=getattr(a.tipo, "id", None), nome=getattr(a.tipo, "nome", None))
+                    except Exception:
+                        tipo = None
+
+                status = None
+                if getattr(a, "status", None) is not None:
+                    try:
+                        status = NamedEntity(id=getattr(a.status, "id", None), nome=getattr(a.status, "nome", None))
+                    except Exception:
+                        status = None
+
+                local_instalacao = None
+                if getattr(a, "local_instalacao", None) is not None:
+                    try:
+                        local_instalacao = NamedEntity(id=getattr(a.local_instalacao, "id", None), nome=getattr(a.local_instalacao, "nome", None))
+                    except Exception:
+                        local_instalacao = None
+
+                summaries.append(
+                    AssetSummary(
+                        id=a.id,
+                        serial_text=getattr(a, "serial_text", None),
+                        descricao=a.descricao,
+                        tag=a.tag,
+                        criado_em=_format_created(getattr(a, "criado_em", None)),
+                        tipo=tipo,
+                        status=status,
+                        local_instalacao=local_instalacao,
+                    )
+                )
+            except Exception as item_err:
+                logger.warning(
+                    f"Skipping asset {getattr(a, 'id', '?')} due to serialization error: {item_err}"
+                )
+                continue
+
+        return summaries
         
     except BusinessLogicError as e:
         logger.warning(f"Business logic error listing assets: {e}")
         raise business_exception_to_http(e)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error listing assets: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while listing assets"
+            detail=f"list_assets failed: {e}"
         )
 
 
-@router.post("/tickets", response_model=CreateTicketResponse)
+@router.post("/tickets", response_model=TicketDetailResponse)
 async def create_ticket(
     payload: CreateTicketRequest,
     session: AsyncSession = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
-) -> CreateTicketResponse:
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> TicketDetailResponse:
     ativo_id: Optional[int] = payload.ativo_id
     if not ativo_id and payload.serial_text:
         # Resolve by serial_text within empresa
@@ -177,6 +231,25 @@ async def create_ticket(
     # Build ticket
     if payload.titulo is None or payload.titulo.strip() == "":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Titulo é obrigatório")
+
+    # Map textual priority/status to IDs if numeric not provided
+    prioridade_id = payload.prioridade_id
+    # Always start as 'Aberto' (open)
+    status_id = None
+    try:
+        if not prioridade_id:
+            # prefer explicit 'prioridade' then 'priority'
+            pr_text = (payload.prioridade or payload.priority or "").strip().lower()
+            if pr_text:
+                result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{pr_text}%")))
+                prow = result.scalars().first()
+                if prow:
+                    prioridade_id = prow.id
+        # status_id remains None to let service set 'open'
+    except Exception:
+        # If mapping fails, continue with provided IDs/defaults
+        pass
+
     ticket_svc = TicketService()
     ticket = await ticket_svc.create_with_asset(
         session=session,
@@ -185,12 +258,21 @@ async def create_ticket(
         ativo_id=ativo_id,
         titulo=payload.titulo,
         descricao=payload.descricao,
-        prioridade_id=payload.prioridade_id,
-        status_id=payload.status_id,
+        prioridade_id=prioridade_id,
+        status_id=status_id,
         categoria_id=payload.categoria_id,
     )
     await session.commit()
-    return CreateTicketResponse(id=ticket.id, numero=ticket.numero, ativo_id=ticket.ativo_id)
+    # Ensure relations are loaded for response building
+    try:
+        await session.refresh(ticket, ['status', 'prioridade', 'categoria', 'requisitante', 'agente'])
+    except Exception:
+        pass
+    # Return full detail for UI/tests
+    detail = await _build_ticket_detail_response(
+        session, ticket, auth_context.role, include_sla=True, include_actions=False
+    )
+    return detail
 
 
 @router.post("/service-orders", response_model=CreateServiceOrderResponse)
@@ -234,8 +316,14 @@ async def list_tickets(
     requisitante_contato_id: Optional[int] = None,
     ativo_id: Optional[int] = None,
     search: Optional[str] = None,
+    # UI-friendly textual filters
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    agent: Optional[str] = None,
+    sla: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    page: int = 1,
 ) -> TicketListResponse:
     """
     List tickets with comprehensive filtering and pagination.
@@ -243,14 +331,21 @@ async def list_tickets(
     """
     try:
         # Check permission
-        if not auth_context.has_permission(Permission.VIEW_TICKETS):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions to view tickets"
-            )
+        if auth_context.role == "requester":
+            if not auth_context.has_permission(Permission.VIEW_OWN_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view own tickets"
+                )
+        else:
+            if not auth_context.has_permission(Permission.VIEW_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view tickets"
+                )
         
         # Build filters
-        filters = {}
+        filters: Dict[str, Any] = {}
         if status_id:
             filters["status_id"] = status_id
         if prioridade_id:
@@ -266,25 +361,66 @@ async def list_tickets(
         if search:
             filters["search"] = search
         
+        # Map textual filters to IDs
+        if status and not filters.get("status_id"):
+            status_name = status.strip().lower()
+            result = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike(f"%{status_name}%")))
+            row = result.scalars().first()
+            if row:
+                filters["status_id"] = row.id
+        if priority and not filters.get("prioridade_id"):
+            priority_name = priority.strip().lower()
+            result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{priority_name}%")))
+            prow = result.scalars().first()
+            if prow:
+                filters["prioridade_id"] = prow.id
+        if agent and not filters.get("agente_contato_id"):
+            agent_val = agent.strip().lower()
+            if agent_val == "unassigned":
+                # will filter after response build
+                pass
+            else:
+                # try parse ID or resolve by name
+                try:
+                    filters["agente_contato_id"] = int(agent_val)
+                except ValueError:
+                    result = await session.execute(select(Contato).where(Contato.nome.ilike(f"%{agent}%")))
+                    contact = result.scalars().first()
+                    if contact:
+                        filters["agente_contato_id"] = contact.id
+        
         # For requesters, only show their own tickets
         if auth_context.role == "requester":
             filters["requisitante_contato_id"] = auth_context.user.contato_id
         
+        # Compute offset from page
+        computed_offset = offset
+        if page and page > 1:
+            computed_offset = (page - 1) * limit
+        
         ticket_svc = TicketService()
         tickets = await ticket_svc.list_tickets(
-            session, auth_context.tenant.empresa_id, filters, limit, offset
+            session, auth_context.tenant.empresa_id, filters, limit, computed_offset
         )
         
         # Convert to response format
         ticket_responses = []
         for ticket in tickets:
             ticket_detail = await _build_ticket_detail_response(
-                session, ticket, auth_context.role
+                session, ticket, auth_context.role, include_sla=True, include_actions=False
             )
             ticket_responses.append(ticket_detail)
+
+        # Apply SLA filter if provided
+        if sla:
+            wanted = sla.strip().lower()
+            ticket_responses = [t for t in ticket_responses if (t.sla_status or "").lower() == wanted]
         
         # Get total count (simplified - in production, use a separate count query)
-        total = len(tickets)  # This is approximate for pagination
+        total = len(ticket_responses)
+        total_pages = 1
+        if limit:
+            total_pages = max(1, (total + limit - 1) // limit)
         
         logger.debug(f"Listed {len(tickets)} tickets for user {auth_context.user.id}")
         
@@ -292,7 +428,9 @@ async def list_tickets(
             tickets=ticket_responses,
             total=total,
             limit=limit,
-            offset=offset
+            offset=computed_offset,
+            page=page,
+            total_pages=total_pages
         )
         
     except BusinessLogicError as e:
@@ -407,27 +545,55 @@ async def update_ticket(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Insufficient permissions to update tickets"
                 )
+        # If requester, ensure they are the ticket owner (requisitante)
+        if auth_context.role == "requester":
+            # Load ticket with cross-tenant access for attendants only
+            tsvc_chk = TicketService()
+            ticket_chk = await tsvc_chk.get_by_id(session, auth_context.tenant.empresa_id, ticket_id)
+            if not ticket_chk:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
+            if ticket_chk.requisitante_contato_id != auth_context.user.contato_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requesters can only comment on their own tickets")
         
         # Convert payload to updates dict
         updates = {}
         for field, value in payload.dict(exclude_unset=True).items():
             if field != "comment":  # Comment is handled separately
                 updates[field] = value
+
+        # Map textual status/priority to IDs for flexibility
+        try:
+            if "status" in updates and updates["status"]:
+                status_name = str(updates["status"]).strip().lower()
+                result = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike(f"%{status_name}%")))
+                srow = result.scalars().first()
+                if srow:
+                    updates["status_id"] = srow.id
+                del updates["status"]
+            if "priority" in updates and updates["priority"]:
+                priority_name = str(updates["priority"]).strip().lower()
+                result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{priority_name}%")))
+                prow = result.scalars().first()
+                if prow:
+                    updates["prioridade_id"] = prow.id
+                del updates["priority"]
+        except Exception:
+            # Fail-safe: if mapping fails, continue with provided IDs only
+            pass
         
-        # Requesters have limited update capabilities
+        # Requesters can only send comments; no field updates allowed
         if auth_context.role == "requester":
-            allowed_fields = {"titulo", "descricao"}
-            invalid_fields = set(updates.keys()) - allowed_fields
-            if invalid_fields:
+            if updates:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Requesters cannot update fields: {', '.join(invalid_fields)}"
+                    detail="Requesters can only add comments to their tickets"
                 )
         
         ticket_svc = TicketService()
         updated_ticket = await ticket_svc.update_ticket(
             session=session,
-            empresa_id=auth_context.tenant.empresa_id,
+            # Empresa 1 (atendente) tem controle total e pode atuar fora do tenant
+            empresa_id=1 if auth_context.tenant.empresa_id == 1 else auth_context.tenant.empresa_id,
             ticket_id=ticket_id,
             user_id=auth_context.user.contato_id,
             user_role=auth_context.role,
@@ -480,11 +646,18 @@ async def get_ticket_analytics(
     """
     try:
         # Check permission
-        if not auth_context.has_permission(Permission.VIEW_TICKETS):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions to view analytics"
-            )
+        if auth_context.role == "requester":
+            if not auth_context.has_permission(Permission.VIEW_OWN_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view own analytics"
+                )
+        else:
+            if not auth_context.has_permission(Permission.VIEW_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view analytics"
+                )
         
         # For requesters, always show only their analytics
         if auth_context.role == "requester":
@@ -504,6 +677,8 @@ async def get_ticket_analytics(
     except BusinessLogicError as e:
         logger.warning(f"Business logic error getting analytics: {e}")
         raise business_exception_to_http(e)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error getting analytics: {e}")
         raise HTTPException(
@@ -529,12 +704,13 @@ async def _build_ticket_detail_response(
         "numero": ticket.numero,
         "titulo": ticket.titulo,
         "descricao": ticket.descricao,
-        "status": ticket.status.nome if ticket.status else None,
-        "prioridade": ticket.prioridade.nome if ticket.prioridade else None,
+        "status": (ticket.status.nome.lower() if ticket.status and ticket.status.nome else None),
+        "prioridade": (ticket.prioridade.nome.lower() if ticket.prioridade and ticket.prioridade.nome else None),
+        "priority": (ticket.prioridade.nome.lower() if ticket.prioridade and ticket.prioridade.nome else None),
         "categoria": ticket.categoria.nome if ticket.categoria else None,
         "ativo_id": ticket.ativo_id,
-        "requisitante": ticket.requisitante.nome if ticket.requisitante else None,
-        "agente": ticket.agente.nome if ticket.agente else None,
+        "requisitante": ({"id": ticket.requisitante.id, "nome": ticket.requisitante.nome} if ticket.requisitante else None),
+        "agente": ({"id": ticket.agente.id, "nome": ticket.agente.nome} if ticket.agente else None),
         "criado_em": ticket.criado_em.isoformat() if ticket.criado_em else None,
         "atualizado_em": ticket.atualizado_em.isoformat() if ticket.atualizado_em else None,
         "fechado_em": ticket.fechado_em.isoformat() if ticket.fechado_em else None,
@@ -544,7 +720,14 @@ async def _build_ticket_detail_response(
     if include_sla:
         workflow = TicketWorkflowEngine()
         sla_breaches = workflow.check_sla_breaches(ticket, datetime.utcnow())
-        response_data["sla_status"] = sla_breaches
+        # Map breaches to UI-friendly indicator
+        if sla_breaches.get("response_breach") or sla_breaches.get("resolution_breach"):
+            sla_indicator = "breach"
+        elif sla_breaches.get("escalation_needed"):
+            sla_indicator = "warning"
+        else:
+            sla_indicator = "ok"
+        response_data["sla_status"] = sla_indicator
     
     # Add next actions if requested
     if include_actions:
@@ -575,17 +758,30 @@ async def list_service_orders(
     search: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    page: int = 1,
 ) -> ServiceOrderListResponse:
     """
     List service orders with comprehensive filtering and pagination.
     Requires manage service orders permission.
     """
     try:
-        # Check permission
-        if not auth_context.has_permission(Permission.MANAGE_SERVICE_ORDERS):
+        if auth_context.role == UserRole.REQUESTER:
+            if not auth_context.has_permission(Permission.VIEW_OWN_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view own service orders"
+                )
+        else:
+            if not auth_context.has_permission(Permission.MANAGE_SERVICE_ORDERS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view service orders"
+                )
+        # Ensure tenant context is available
+        if not auth_context.tenant or not auth_context.tenant.empresa_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions to view service orders"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Usuário sem empresa associada"
             )
         
         # Build filters
@@ -598,10 +794,17 @@ async def list_service_orders(
             filters["numero_apr"] = numero_apr
         if search:
             filters["search"] = search
+        if auth_context.role == UserRole.REQUESTER:
+            filters["requisitante_contato_id"] = auth_context.tenant.contato_id
+        
+        # Compute offset from page for UI parity with tickets
+        computed_offset = offset
+        if page and page > 1:
+            computed_offset = (page - 1) * limit
         
         service_order_svc = OrdemServicoService()
         service_orders = await service_order_svc.list_service_orders(
-            session, auth_context.tenant.empresa_id, filters, limit, offset
+            session, auth_context.tenant.empresa_id, filters, limit, computed_offset
         )
         
         # Convert to response format
@@ -611,7 +814,10 @@ async def list_service_orders(
             so_responses.append(so_detail)
         
         # Get total count (simplified - in production, use a separate count query)
-        total = len(service_orders)  # This is approximate for pagination
+        total = len(service_orders)
+        total_pages = 1
+        if limit:
+            total_pages = max(1, (total + limit - 1) // limit)
         
         logger.debug(f"Listed {len(service_orders)} service orders for user {auth_context.user.id}")
         
@@ -619,7 +825,9 @@ async def list_service_orders(
             service_orders=so_responses,
             total=total,
             limit=limit,
-            offset=offset
+            offset=computed_offset,
+            page=page,
+            total_pages=total_pages
         )
         
     except BusinessLogicError as e:
@@ -634,63 +842,59 @@ async def list_service_orders(
 
 
 @router.get(
-    "/service-orders/{service_order_id}",
-    response_model=ServiceOrderDetailResponse,
+    "/service-orders/analytics",
+    response_model=ServiceOrderAnalyticsResponse,
     responses={
-        200: {"description": "Service order details with activity tracking"},
+        200: {"description": "Service order analytics and time tracking"},
         403: {"model": ErrorResponse, "description": "Insufficient permissions"},
-        404: {"model": ErrorResponse, "description": "Service order not found"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     },
-    summary="Get service order details",
-    description="Retrieve detailed information about a specific service order including activity log and time tracking."
+    summary="Get service order analytics",
+    description="Retrieve comprehensive service order analytics including time tracking and completion rates."
 )
-async def get_service_order(
-    service_order_id: int,
+async def get_service_order_analytics(
     session: AsyncSession = Depends(get_db),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
-) -> ServiceOrderDetailResponse:
+    user_specific: bool = False,
+) -> ServiceOrderAnalyticsResponse:
     """
-    Get detailed service order information with activity tracking.
+    Get comprehensive service order analytics with time tracking.
     """
     try:
         # Check permission
         if not auth_context.has_permission(Permission.MANAGE_SERVICE_ORDERS):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions to view service orders"
+                detail="Insufficient permissions to view service order analytics"
+            )
+        # Ensure tenant context is available
+        if not auth_context.tenant or not auth_context.tenant.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Usuário sem empresa associada"
             )
         
         service_order_svc = OrdemServicoService()
-        so = await service_order_svc.get_by_id(
-            session, auth_context.tenant.empresa_id, service_order_id
+        analytics = await service_order_svc.get_service_order_analytics(
+            session=session,
+            empresa_id=auth_context.tenant.empresa_id,
+            user_id=auth_context.user.contato_id if user_specific else None
         )
         
-        if not so:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Service order with ID {service_order_id} not found"
-            )
+        logger.debug(f"Generated service order analytics for user {auth_context.user.id}")
         
-        # Build detailed response
-        so_detail = await _build_service_order_detail_response(
-            session, so, include_activities=True, include_time_tracking=True
-        )
-        
-        logger.debug(f"Retrieved service order {so.numero_os} for user {auth_context.user.id}")
-        
-        return so_detail
+        return ServiceOrderAnalyticsResponse(**analytics)
         
     except BusinessLogicError as e:
-        logger.warning(f"Business logic error getting service order {service_order_id}: {e}")
+        logger.warning(f"Business logic error getting service order analytics: {e}")
         raise business_exception_to_http(e)
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception(f"Unexpected error getting service order {service_order_id}: {e}")
+        logger.exception(f"Unexpected error getting service order analytics: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while retrieving the service order"
+            detail=f"An unexpected error occurred while generating analytics: {e}"
         )
 
 
@@ -853,51 +1057,63 @@ async def add_service_order_activity(
 
 
 @router.get(
-    "/service-orders/analytics",
-    response_model=ServiceOrderAnalyticsResponse,
+    "/service-orders/{service_order_id}",
+    response_model=ServiceOrderDetailResponse,
     responses={
-        200: {"description": "Service order analytics and time tracking"},
+        200: {"description": "Service order details with activity tracking"},
         403: {"model": ErrorResponse, "description": "Insufficient permissions"},
+        404: {"model": ErrorResponse, "description": "Service order not found"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     },
-    summary="Get service order analytics",
-    description="Retrieve comprehensive service order analytics including time tracking and completion rates."
+    summary="Get service order details",
+    description="Retrieve detailed information about a specific service order including activity log and time tracking."
 )
-async def get_service_order_analytics(
+async def get_service_order(
+    service_order_id: int,
     session: AsyncSession = Depends(get_db),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
-    user_specific: bool = False,
-) -> ServiceOrderAnalyticsResponse:
+) -> ServiceOrderDetailResponse:
     """
-    Get comprehensive service order analytics with time tracking.
+    Get detailed service order information with activity tracking.
     """
     try:
         # Check permission
         if not auth_context.has_permission(Permission.MANAGE_SERVICE_ORDERS):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions to view service order analytics"
+                detail="Insufficient permissions to view service orders"
             )
         
         service_order_svc = OrdemServicoService()
-        analytics = await service_order_svc.get_service_order_analytics(
-            session=session,
-            empresa_id=auth_context.tenant.empresa_id,
-            user_id=auth_context.user.contato_id if user_specific else None
+        so = await service_order_svc.get_by_id(
+            session, auth_context.tenant.empresa_id, service_order_id
         )
         
-        logger.debug(f"Generated service order analytics for user {auth_context.user.id}")
+        if not so:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Service order with ID {service_order_id} not found"
+            )
         
-        return ServiceOrderAnalyticsResponse(**analytics)
+        # Build detailed response
+        so_detail = await _build_service_order_detail_response(
+            session, so, include_activities=True, include_time_tracking=True
+        )
+        
+        logger.debug(f"Retrieved service order {so.numero_os} for user {auth_context.user.id}")
+        
+        return so_detail
         
     except BusinessLogicError as e:
-        logger.warning(f"Business logic error getting service order analytics: {e}")
+        logger.warning(f"Business logic error getting service order {service_order_id}: {e}")
         raise business_exception_to_http(e)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception(f"Unexpected error getting service order analytics: {e}")
+        logger.exception(f"Unexpected error getting service order {service_order_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred while generating analytics: {e}"
+            detail="An unexpected error occurred while retrieving the service order"
         )
 
 

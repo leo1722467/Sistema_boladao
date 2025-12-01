@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Optional, List
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Ativo, Estoque
@@ -10,7 +11,16 @@ class AtivoRepository:
     """Repository for Ativo (asset) operations with empresa scoping."""
 
     async def list_by_empresa(self, session: AsyncSession, empresa_id: int) -> List[Ativo]:
-        stmt = select(Ativo).where(Ativo.empresa_id == empresa_id).limit(200)
+        stmt = (
+            select(Ativo)
+            .where(Ativo.empresa_id == empresa_id)
+            .options(
+                selectinload(Ativo.tipo),
+                selectinload(Ativo.status),
+                selectinload(Ativo.local_instalacao),
+            )
+            .limit(200)
+        )
         res = await session.execute(stmt)
         return res.scalars().all()
 

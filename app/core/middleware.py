@@ -1,40 +1,14 @@
 """Authentication & security middlewares."""
 import logging
-import uuid
 from typing import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response as StarletteResponse
 
 from app.core.security import verify_jwt_token  # sua função existente
 
 logger = logging.getLogger(__name__)
-
-REQUEST_ID_HEADER = "X-Request-ID"
-
-
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Inject a per-request ID for traceability."""
-
-    async def dispatch(self, request: Request, call_next: Callable) -> StarletteResponse:
-        request_id = request.headers.get(REQUEST_ID_HEADER, str(uuid.uuid4()))
-        response: StarletteResponse = await call_next(request)
-        response.headers[REQUEST_ID_HEADER] = request_id
-        return response
-
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Set minimal security headers (CSP pode ser adicionado depois)."""
-
-    async def dispatch(self, request: Request, call_next: Callable) -> StarletteResponse:
-        response: StarletteResponse = await call_next(request)
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-        response.headers.setdefault("X-XSS-Protection", "0")
-        return response
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):

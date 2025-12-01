@@ -98,18 +98,25 @@ class DatabaseManager:
         }
     
     def run_migrations(self, target_revision: Optional[str] = None) -> bool:
-        """Run database migrations."""
+        """Run migrations synchronously. Prefer `run_migrations_async` inside async contexts."""
         try:
-            if target_revision:
-                command.upgrade(self.alembic_cfg, target_revision)
-            else:
-                command.upgrade(self.alembic_cfg, "head")
-            
+            rev = target_revision or "heads"
+            command.upgrade(self.alembic_cfg, rev)
             logger.info(f"Successfully ran migrations to {target_revision or 'head'}")
             return True
-            
         except Exception as e:
             logger.error(f"Error running migrations: {e}")
+            return False
+
+    async def run_migrations_async(self, target_revision: Optional[str] = None) -> bool:
+        """Run Alembic migrations from an async context without event-loop conflicts."""
+        try:
+            rev = target_revision or "heads"
+            await asyncio.to_thread(command.upgrade, self.alembic_cfg, rev)
+            logger.info(f"Successfully ran migrations to {target_revision or 'head'} (async)")
+            return True
+        except Exception as e:
+            logger.error(f"Error running migrations (async): {e}")
             return False
     
     def create_migration(self, message: str, auto_generate: bool = True) -> bool:
@@ -211,6 +218,31 @@ class DatabaseManager:
             health_status["error"] = str(e)
         
         return health_status
+
+    async def ensure_schema_consistency(self) -> None:
+        """Ensure critical columns and indexes exist; apply lightweight fixes for SQLite."""
+        engine = create_async_engine(str(self.settings.DB_URL))
+        async with engine.begin() as conn:
+            # ativo.empresa_id column
+            try:
+                result = await conn.execute(text("PRAGMA table_info('ativo')"))
+                cols = [row[1] for row in result.fetchall()]  # row[1] is column name
+                if 'empresa_id' not in cols:
+                    await conn.execute(text("ALTER TABLE ativo ADD COLUMN empresa_id INTEGER"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ativo_empresa_id ON ativo(empresa_id)"))
+            except Exception as e:
+                logger.error(f"Failed to ensure ativo.empresa_id: {e}")
+            
+            # estoque.empresa_id column
+            try:
+                result = await conn.execute(text("PRAGMA table_info('estoque')"))
+                cols = [row[1] for row in result.fetchall()]
+                if 'empresa_id' not in cols:
+                    await conn.execute(text("ALTER TABLE estoque ADD COLUMN empresa_id INTEGER"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_estoque_empresa_id ON estoque(empresa_id)"))
+            except Exception as e:
+                logger.error(f"Failed to ensure estoque.empresa_id: {e}")
+        await engine.dispose()
     
     async def backup_database(self, backup_path: Optional[str] = None) -> bool:
         """Create a database backup (SQLite only)."""
@@ -338,23 +370,22 @@ db_manager = DatabaseManager()
 async def initialize_database():
     """Initialize database with migrations."""
     logger.info("Initializing database...")
+    # Always run migrations to ensure schema is in sync, handling multi-head branches
+    logger.info("Running database migrations...")
+    success = await db_manager.run_migrations_async()
     
-    # Check migration status
-    status = await db_manager.check_migration_status()
-    logger.info(f"Migration status: {status}")
-    
-    # Run migrations if needed
-    if status["status"] != "up_to_date":
-        logger.info("Running database migrations...")
-        success = db_manager.run_migrations()
-        
-        if success:
-            logger.info("Database migrations completed successfully")
-        else:
-            logger.error("Database migrations failed")
-            raise RuntimeError("Failed to run database migrations")
+    if success:
+        logger.info("Database migrations completed successfully")
     else:
-        logger.info("Database is up to date")
+        logger.error("Database migrations failed")
+        raise RuntimeError("Failed to run database migrations")
+
+    # Post-migration schema consistency checks and repairs
+    try:
+        await db_manager.ensure_schema_consistency()
+        logger.info("Schema consistency ensured")
+    except Exception as e:
+        logger.error(f"Schema consistency check failed: {e}")
 
 
 async def check_database_ready() -> bool:

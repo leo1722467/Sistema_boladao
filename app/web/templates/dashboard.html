@@ -723,8 +723,12 @@
     // Load dashboard data
     async function loadDashboardData() {
       try {
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
         // Load ticket analytics
-        const ticketResponse = await fetch('/api/helpdesk/analytics');
+        const ticketResponse = await fetch('/api/helpdesk/analytics', { credentials: 'include', headers });
         if (ticketResponse.ok) {
           const ticketData = await ticketResponse.json();
           document.getElementById('openTickets').textContent = ticketData.total_tickets || 0;
@@ -732,14 +736,14 @@
         }
 
         // Load service order analytics
-        const soResponse = await fetch('/api/helpdesk/service-orders/analytics');
+        const soResponse = await fetch('/api/helpdesk/service-orders/analytics', { credentials: 'include', headers });
         if (soResponse.ok) {
           const soData = await soResponse.json();
           document.getElementById('completedOrders').textContent = soData.total_service_orders || 0;
         }
 
         // Load asset count
-        const assetResponse = await fetch('/api/helpdesk/assets?limit=1');
+        const assetResponse = await fetch('/api/helpdesk/assets?limit=1', { credentials: 'include', headers });
         if (assetResponse.ok) {
           const assetData = await assetResponse.json();
           document.getElementById('activeAssets').textContent = assetData.total || 0;

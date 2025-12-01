@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -28,8 +28,11 @@ async def get_tenant_context(
 
     contato: Optional[Contato] = await session.get(Contato, current_user.contato_id)
     if not contato or contato.empresa_id is None:
-        # Fallback to 0 or raise error as per policy; choosing strict behavior
-        raise ValueError("Authenticated user has no associated empresa (company)")
+        # Return a clear HTTP error instead of crashing with 500
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authenticated user has no associated empresa (company)"
+        )
 
     return TenantContext(
         empresa_id=int(contato.empresa_id),

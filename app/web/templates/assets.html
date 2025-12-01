@@ -781,19 +781,31 @@
         if (type) params.append('type', type);
         if (location) params.append('location', location);
         
-        const response = await fetch(`/api/helpdesk/assets?${params}`);
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch(`/api/helpdesk/assets?${params}`, { credentials: 'include', headers });
         
         if (!response.ok) {
           throw new Error('Erro ao carregar ativos');
         }
         
         const data = await response.json();
-        currentAssets = data.assets || [];
-        currentPage = data.page || 1;
-        totalPages = data.total_pages || 1;
+        // Tolerate both array and object response shapes
+        if (Array.isArray(data)) {
+          currentAssets = data;
+          currentPage = 1;
+          totalPages = 1;
+          updateAssetsCount(data.length);
+        } else {
+          currentAssets = data.assets || data.items || [];
+          currentPage = data.page || 1;
+          totalPages = data.total_pages || data.totalPages || 1;
+          const totalCount = (data.total ?? (data.counts && data.counts.total)) ?? currentAssets.length;
+          updateAssetsCount(totalCount);
+        }
         
         renderAssetsTable();
-        updateAssetsCount(data.total || 0);
         
       } catch (error) {
         console.error('Error loading assets:', error);

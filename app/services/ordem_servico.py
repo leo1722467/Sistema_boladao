@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
 
 from app.repositories.ordem_servico import OrdemServicoRepository
 from app.repositories.chamado import ChamadoRepository
@@ -261,8 +262,11 @@ class OrdemServicoService:
         try:
             ErrorHandler.validate_positive_integer(empresa_id, "empresa_id")
             
-            # Build query with tenant scoping through tickets
-            query = select(OrdemServico).join(
+            # Build query with tenant scoping through tickets and eager load relations
+            query = select(OrdemServico).options(
+                selectinload(OrdemServico.tipo),
+                selectinload(OrdemServico.chamado),
+            ).join(
                 Chamado, OrdemServico.chamado_id == Chamado.id
             ).where(Chamado.empresa_id == empresa_id)
             
@@ -285,6 +289,8 @@ class OrdemServicoService:
                             OrdemServico.observacao.ilike(search_term)
                         )
                     )
+                if "requisitante_contato_id" in filters:
+                    query = query.where(Chamado.requisitante_contato_id == filters["requisitante_contato_id"])
             
             # Apply pagination and ordering
             query = query.order_by(OrdemServico.id.desc()).offset(offset).limit(limit)
@@ -356,6 +362,8 @@ class OrdemServicoService:
         try:
             # Get service orders for analysis
             filters = {}
+            if user_id is not None:
+                filters["requisitante_contato_id"] = user_id
             service_orders = await self.list_service_orders(session, empresa_id, filters, limit=1000)
             
             analytics = {

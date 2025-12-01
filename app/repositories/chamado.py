@@ -19,6 +19,11 @@ class ChamadoRepository:
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def get_by_id_global(self, session: AsyncSession, chamado_id: int) -> Optional[Chamado]:
+        stmt = select(Chamado).where(Chamado.id == chamado_id)
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def create(
         self,
         session: AsyncSession,

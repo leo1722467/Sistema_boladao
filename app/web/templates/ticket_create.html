@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novo Chamado - Sistema Boladão</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #fff; line-height: 1.6; }
+    .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100vh; background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 1000; transition: transform 0.3s ease; overflow-y: auto; }
+    .sidebar.collapsed { transform: translateX(-280px); }
+    .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-header h2 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
+    .sidebar-header p { font-size: 14px; opacity: 0.8; }
+    .sidebar-nav { padding: 20px 0; }
+    .nav-item { display: block; padding: 12px 20px; color: white; text-decoration: none; transition: all 0.3s ease; border-left: 3px solid transparent; }
+    .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); border-left-color: #3498db; }
+    .nav-item i { width: 20px; margin-right: 10px; }
+    .main-content { margin-left: 280px; min-height: 100vh; transition: margin-left 0.3s ease; }
+    .main-content.expanded { margin-left: 0; }
+    .top-bar { background: #0b1220; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; position: relative; }
+    .top-bar > div:first-child { position: absolute; left: 24px; }
+    .menu-toggle { background: none; border: none; font-size: 20px; cursor: pointer; color: #9aa4b2; }
+    .page-title { font-size: 30px; font-weight: 800; color: #e2e8f0; text-align: center; }
+    .container { padding: 0; max-width: none; }
+    .game-slider { position: relative; width: calc(100vw - 280px); height: calc(100vh - 64px); overflow: hidden; }
+    .slides { display: flex; width: calc(100%); height: 100%; transition: transform 0.5s ease-in-out; }
+    .slide { flex: 0 0 100%; display: grid; grid-template-columns: 1fr; gap: 24px; padding: 0; align-content: stretch; font-size: 24px; font-weight: bold; }
+    .square { border-radius: 20px; padding: 20px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
+    .sq-blue { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
+    .sq-green { background: linear-gradient(135deg, #166534, #22c55e); }
+    .sq-orange { background: linear-gradient(135deg, #7c2d12, #f59e0b); }
+    .sq-purple { background: linear-gradient(135deg, #5b21b6, #a78bfa); }
+    .sq-pink { background: linear-gradient(135deg, #9d174d, #ec4899); }
+    .sq-slate { background: linear-gradient(135deg, #1f2937, #64748b); }
+    .square h3 { font-size: 24px; font-weight: 800; margin-bottom: 12px; color: #fff; text-align: center; }
+    .input, .select, .textarea { width: 100%; height: 100%; padding: 10px 12px; border: none; border-radius: 10px; font-size: 14px; background: rgba(255,255,255,0.12); color: #fff; text-align: center; }
+    .textarea { min-height: 120px; }
+    .side-controls { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; }
+    .side-left { left: 0; }
+    .side-right { right: 0; }
+    .side-btn { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 100%; border: none; border-radius: 0; background: rgba(255,255,255,0.12); color: #e2e8f0; cursor: pointer; }
+    .btn { display: inline-flex; align-items: center; padding: 10px 18px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.2s ease; }
+    .btn-primary { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; }
+    .btn-ghost { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+    .btn:hover { transform: translateY(-2px); }
+    .progress { position: absolute; left: 24px; bottom: 24px; display: flex; gap: 10px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.25); cursor: pointer; }
+    .dot.active { background: #3b82f6; }
+    .empty-state { text-align: center; padding: 40px 20px; color: #e2e8f0; }
+    .center-step { display: flex; align-items: stretch; justify-content: center; height: 100%; font-size: 24px; font-weight: bold; }
+    .center-box { width: 100%; max-width: none; height: 100%; display: flex; }
+    .square { height: 100%; width: 100%; display: flex; flex-direction: column; flex: 1; }
+    .input, .select, .textarea { width: 100%; }
+    .textarea { flex: 1; resize: none; }
+    .options-grid { display: grid; gap: 20px; height: 100%; align-content: stretch; }
+    .option-btn { display: flex; align-items: center; justify-content: center; padding: 24px; border-radius: 16px; background: rgba(255,255,255,0.12); color: #fff; font-weight: 600; cursor: pointer; border: 2px solid transparent; height: 100%; }
+    .option-btn.active { border-color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Sistema Boladão</h2>
+      <p>Novo Chamado</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+      <a href="/tickets" class="nav-item active"><i class="fas fa-ticket-alt"></i> Chamados</a>
+      <a href="/assets" class="nav-item"><i class="fas fa-desktop"></i> Ativos</a>
+      <a href="/service-orders" class="nav-item"><i class="fas fa-tools"></i> Ordens de Serviço</a>
+      <a href="/inventory" class="nav-item"><i class="fas fa-boxes"></i> Estoque</a>
+      <a href="/integrations" class="nav-item"><i class="fas fa-plug"></i> Integrações</a>
+      <a href="/web/tables" class="nav-item"><i class="fas fa-database"></i> Admin</a>
+    </nav>
+  </div>
+
+  <div class="main-content" id="mainContent">
+    <div class="top-bar">
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+        <h1 class="page-title">Novo Chamado</h1>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="container">
+      <div class="game-slider">
+        <div id="slides" class="slides">
+          <div class="slide"><div class="center-step"><div class="center-box"><div class="square sq-blue"><h3>Título</h3><input id="tituloInput" class="input" placeholder="Como podemos nomear este chamado?" /></div></div></div></div>
+          <div class="slide"><div class="center-step"><div class="center-box"><div class="square sq-green"><h3>Descrição</h3><textarea id="descricaoInput" class="textarea" placeholder="Conte os detalhes, sintomas, contexto"></textarea></div></div></div></div>
+          <div class="slide"><div class="center-step">Prioridade</div><div class="options-grid" id="priorityGrid"></div></div>
+          <div class="slide"><div class="center-step">Categoria</div><div class="options-grid" id="categoryGrid"></div></div>
+          <div class="slide"><div class="center-step">Agente</div><div class="options-grid" id="agentGrid"></div></div>
+          <div class="slide"><div class="grid-title">Proprietário</div><div class="options-grid" id="ownerGrid"></div></div>
+          <div class="slide"><div class="grid-title">Ativo</div><div class="options-grid" id="assetGrid"></div></div>
+          <div class="slide"><div class="square sq-blue" style="height:100%;"><h3 style="margin-bottom:16px;">Resumo</h3><div id="summaryBox" class="empty-state" style="padding: 0; text-align: left;"></div><div style="margin-top:20px;"><button id="createTicketBtn" class="btn btn-primary"><i class="fas fa-gamepad"></i> Criar Chamado</button></div></div></div>
+        </div>
+        <div class="side-controls side-left"><button id="prevBtn" class="side-btn"><i class="fas fa-chevron-left"></i></button></div>
+        <div class="side-controls side-right"><button id="nextBtn" class="side-btn"><i class="fas fa-chevron-right"></i></button></div>
+        <div class="progress">
+          <div id="dot0" class="dot active"></div>
+          <div id="dot1" class="dot"></div>
+          <div id="dot2" class="dot"></div>
+          <div id="dot3" class="dot"></div>
+          <div id="dot4" class="dot"></div>
+          <div id="dot5" class="dot"></div>
+          <div id="dot6" class="dot"></div>
+          <div id="dot7" class="dot"></div>
+        </div>
+      </div>
+      <div id="resultBox" class="empty-state" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async function() {
+      const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='))
+      if (!hasToken) { window.location.href = '/'; return }
+      document.getElementById('menuToggle').addEventListener('click', toggleSidebar)
+      await loadOptions()
+      document.getElementById('createTicketBtn').addEventListener('click', submitTicket)
+    })
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar')
+      const mainContent = document.getElementById('mainContent')
+      sidebar.classList.toggle('collapsed')
+      mainContent.classList.toggle('expanded')
+    }
+
+    let prOpts = []
+    let ctOpts = []
+    let catOpts = []
+    let atOpts = []
+    let selectedPriorityId = null
+    let selectedCategoryId = null
+    let selectedAgentId = null
+    let selectedOwnerId = null
+    let selectedAssetId = null
+    async function loadOptions() {
+      try {
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='))
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+        const prRes = await fetch('/admin/Prioridade/items', { credentials: 'include', headers })
+        prOpts = prRes.ok ? await prRes.json() : []
+        const ctRes = await fetch('/admin/Contato/items', { credentials: 'include', headers })
+        ctOpts = ctRes.ok ? await ctRes.json() : []
+        const catRes = await fetch('/admin/chamado/foreign-key-options/categoria_id', { credentials: 'include', headers })
+        catOpts = catRes.ok ? await catRes.json() : []
+        const atRes = await fetch('/admin/Ativo/items', { credentials: 'include', headers })
+        atOpts = atRes.ok ? await atRes.json() : []
+        renderOptionGrids()
+      } catch (e) {
+        console.error('Erro ao carregar opções', e)
+      }
+    }
+    // Dynamic font size for text inputs based on length
+    function adjustFont(el, max=48, min=16) {
+      const len = (el.value || '').length
+      const size = Math.max(min, Math.round(max - len * 0.6))
+      el.style.fontSize = size + 'px'
+      el.style.lineHeight = (size + 10) + 'px'
+    }
+    const tituloEl = document.getElementById('tituloInput')
+    const descEl = document.getElementById('descricaoInput')
+    tituloEl.addEventListener('input', () => adjustFont(tituloEl, 56, 18))
+    descEl.addEventListener('input', () => adjustFont(descEl, 42, 16))
+    tituloEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nextSlide() } })
+    descEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nextSlide() } })
+    adjustFont(tituloEl, 56, 18)
+    adjustFont(descEl, 42, 16)
+    function renderOptionGrids() {
+      const pGrid = document.getElementById('priorityGrid')
+      const cGrid = document.getElementById('categoryGrid')
+      const aGrid = document.getElementById('agentGrid')
+      const oGrid = document.getElementById('ownerGrid')
+      const sGrid = document.getElementById('assetGrid')
+      pGrid.innerHTML = prOpts.map(o => `<div class="option-btn ${selectedPriorityId===o.id?'active':''}" onclick="selectPriority(${o.id})">${o.nome}</div>`).join('')
+      cGrid.innerHTML = catOpts.map(o => `<div class="option-btn ${selectedCategoryId===o.id?'active':''}" onclick="selectCategory(${o.id})">${o.nome || 'Categoria'} #${o.id}</div>`).join('')
+      aGrid.innerHTML = ctOpts.map(o => `<div class="option-btn ${selectedAgentId===o.id?'active':''}" onclick="selectAgent(${o.id})">${o.nome || o.email || 'Contato'} #${o.id}</div>`).join('')
+      oGrid.innerHTML = ctOpts.map(o => `<div class="option-btn ${selectedOwnerId===o.id?'active':''}" onclick="selectOwner(${o.id})">${o.nome || o.email || 'Contato'} #${o.id}</div>`).join('')
+      sGrid.innerHTML = atOpts.map(o => `<div class="option-btn ${selectedAssetId===o.id?'active':''}" onclick="selectAsset(${o.id})">${o.tag || o.descricao || 'Ativo'} #${o.id}</div>`).join('')
+      const setGrid = (grid, count) => {
+        const cols = Math.ceil(Math.sqrt(Math.max(count,1)))
+        const rows = Math.ceil(count / cols)
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`
+        grid.style.gridTemplateRows = `repeat(${rows || 1}, 1fr)`
+      }
+      setGrid(pGrid, prOpts.length)
+      setGrid(cGrid, catOpts.length)
+      setGrid(aGrid, ctOpts.length)
+      setGrid(oGrid, ctOpts.length)
+      setGrid(sGrid, atOpts.length)
+    }
+    function selectPriority(id) { selectedPriorityId = id; renderOptionGrids(); nextSlide() }
+    function selectCategory(id) { selectedCategoryId = id; renderOptionGrids(); nextSlide() }
+    function selectAgent(id) { selectedAgentId = id; renderOptionGrids(); nextSlide() }
+    function selectOwner(id) { selectedOwnerId = id; renderOptionGrids(); nextSlide() }
+    function selectAsset(id) { selectedAssetId = id; renderOptionGrids(); nextSlide() }
+
+    async function submitTicket() {
+      try {
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='))
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null
+        const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }
+        const payload = {
+          titulo: document.getElementById('tituloInput').value,
+          descricao: document.getElementById('descricaoInput').value,
+          prioridade_id: selectedPriorityId,
+          status_id: 1,
+          categoria_id: selectedCategoryId || null,
+          agente_contato_id: selectedAgentId || null,
+          proprietario_contato_id: selectedOwnerId || null,
+          ativo_id: selectedAssetId || null
+        }
+        const res = await fetch('/api/helpdesk/tickets', { method: 'POST', credentials: 'include', headers, body: JSON.stringify(payload) })
+        if (!res.ok) {
+          let msg = 'Erro ao criar chamado'
+          try { const err = await res.json(); if (res.status === 401) msg = 'Sessão expirada. Faça login novamente.'; else if (res.status === 403) msg = 'Sem permissão para criar chamado.'; else if (res.status === 400) msg = err.detail || 'Dados inválidos.'; } catch {}
+          throw new Error(msg)
+        }
+        const data = await res.json()
+        document.getElementById('resultBox').style.display = 'block'
+        document.getElementById('resultBox').innerHTML = `<i class="fas fa-check-circle"></i><h3>Chamado criado</h3><p>Número: ${data.numero || data.id} · Título: ${data.titulo}</p>`
+        setTimeout(() => { window.location.href = '/tickets' }, 900)
+      } catch (error) {
+        const box = document.getElementById('resultBox')
+        box.style.display = 'block'
+        box.innerHTML = `<i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>${error.message}</p>`
+      }
+    }
+
+    let currentIndex = 0
+    function nextSlide() { currentIndex = Math.min(7, currentIndex + 1); updateSlider() }
+    function goToSlide(i) { currentIndex = Math.max(0, Math.min(7, i)); updateSlider() }
+    function updateSlider() {
+      document.getElementById('slides').style.transform = `translateX(-${currentIndex * 100}%)`
+      for (let i = 0; i < 8; i++) {
+        const d = document.getElementById('dot' + i)
+        if (d) d.classList.toggle('active', i === currentIndex)
+      }
+      if (currentIndex === 7) {
+        const titulo = (document.getElementById('tituloInput').value || '').trim()
+        const descricao = (document.getElementById('descricaoInput').value || '').trim()
+        const prText = (prOpts.find(x=>x.id===selectedPriorityId)?.nome) || '-'
+        const catText = (catOpts.find(x=>x.id===selectedCategoryId)?.nome) || '-'
+        const agText = (ctOpts.find(x=>x.id===selectedAgentId)?.nome) || '-'
+        const propText = (ctOpts.find(x=>x.id===selectedOwnerId)?.nome) || '-'
+        const atText = (atOpts.find(x=>x.id===selectedAssetId)?.tag) || '-'
+        document.getElementById('summaryBox').innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+            <div class="square sq-slate"><h3>Título</h3><div class="empty-state">${titulo || '-'}</div></div>
+            <div class="square sq-green"><h3>Prioridade</h3><div class="empty-state">${prText}</div></div>
+            <div class="square sq-orange" style="grid-column:1/-1"><h3>Descrição</h3><div class="empty-state">${descricao || '-'}</div></div>
+            <div class="square sq-purple"><h3>Categoria</h3><div class="empty-state">${catText}</div></div>
+            <div class="square sq-pink"><h3>Agente</h3><div class="empty-state">${agText}</div></div>
+            <div class="square sq-blue"><h3>Proprietário</h3><div class="empty-state">${propText}</div></div>
+            <div class="square sq-green"><h3>Ativo</h3><div class="empty-state">${atText}</div></div>
+          </div>
+        `
+      }
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') { currentIndex = Math.min(7, currentIndex + 1); updateSlider() }
+      if (e.key === 'ArrowLeft') { currentIndex = Math.max(0, currentIndex - 1); updateSlider() }
+    })
+    document.getElementById('nextBtn').addEventListener('click', () => { currentIndex = Math.min(7, currentIndex + 1); updateSlider() })
+    document.getElementById('prevBtn').addEventListener('click', () => { currentIndex = Math.max(0, currentIndex - 1); updateSlider() })
+    for (let i = 0; i < 8; i++) { const d = document.getElementById('dot' + i); if (d) d.addEventListener('click', () => goToSlide(i)) }
+    updateSlider()
+  </script>
+</body>
+</html>
