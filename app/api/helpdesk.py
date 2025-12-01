@@ -18,6 +18,7 @@ from app.services.inventory import InventoryService
 from app.services.ticket import TicketService
 from app.services.ordem_servico import OrdemServicoService
 from app.db.models import StatusChamado, Prioridade, Contato
+from app.repositories.chamado_defeito import ChamadoDefeitoRepository
 from app.schemas.helpdesk import (
     InventoryIntakeRequest,
     InventoryIntakeResponse,
@@ -39,6 +40,9 @@ from app.schemas.helpdesk import (
     ServiceOrderFilters,
     ServiceOrderListResponse,
     ServiceOrderAnalyticsResponse,
+    CreateDefeitoRequest,
+    DefeitoResponse,
+    DefeitoListResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -1164,3 +1168,71 @@ async def _build_service_order_detail_response(
             }
     
     return ServiceOrderDetailResponse(**response_data)
+
+
+@router.get(
+    "/defeitos",
+    response_model=DefeitoListResponse,
+    summary="List defects by asset type",
+)
+async def list_defeitos(
+    tipo_ativo_id: int,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(require_any_authenticated_role),
+) -> DefeitoListResponse:
+    # Any authenticated user can list defects to open tickets
+    repo = ChamadoDefeitoRepository()
+    items = await repo.list_by_tipo_ativo(session, tipo_ativo_id)
+    def _to_response(d) -> DefeitoResponse:
+        ta = None
+        try:
+            if getattr(d, "tipo_ativo", None) is not None:
+                ta = NamedEntity(id=getattr(d.tipo_ativo, "id", None), nome=getattr(d.tipo_ativo, "nome", None))
+        except Exception:
+            ta = None
+        return DefeitoResponse(id=d.id, nome=d.nome, tipo_ativo=ta)
+    return DefeitoListResponse(defeitos=[_to_response(d) for d in items])
+
+
+@router.post(
+    "/defeitos",
+    response_model=DefeitoResponse,
+    summary="Create defect for asset type",
+)
+async def create_defeito(
+    payload: CreateDefeitoRequest,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(require_agent_or_admin_role),
+) -> DefeitoResponse:
+    if not auth_context.has_permission(Permission.MANAGE_TICKETS):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    repo = ChamadoDefeitoRepository()
+    entity = await repo.create(session, nome=payload.nome, tipo_ativo_id=payload.tipo_ativo_id)
+    await session.commit()
+    ta = None
+    try:
+        await session.refresh(entity, ["tipo_ativo"])  
+        if getattr(entity, "tipo_ativo", None) is not None:
+            ta = NamedEntity(id=getattr(entity.tipo_ativo, "id", None), nome=getattr(entity.tipo_ativo, "nome", None))
+    except Exception:
+        ta = None
+    return DefeitoResponse(id=entity.id, nome=entity.nome, tipo_ativo=ta)
+
+
+@router.delete(
+    "/defeitos/{defeito_id}",
+    summary="Delete defect",
+)
+async def delete_defeito(
+    defeito_id: int,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(require_agent_or_admin_role),
+):
+    if not auth_context.has_permission(Permission.MANAGE_TICKETS):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    repo = ChamadoDefeitoRepository()
+    ok = await repo.delete(session, defeito_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Defeito não encontrado")
+    await session.commit()
+    return {"message": "Defeito removido"}

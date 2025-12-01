@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       'Inventory & Parts': ['Fabricante', 'CategoriaPeca', 'StatusEstoque', 'UnidadeMedida', 'TipoMovimentacao', 'CatalogoPeca', 'Estoque', 'MovimentacaoEstoque'],
       'Procedures': ['Procedimento', 'EtapaProcedimento'],
       'APR (Risk Assessment)': ['SetorAtuacaoCliente', 'CategoriaSetor', 'RiscosAPR', 'MedidasControleAPR', 'AtividadeAPR', 'EPIAPR', 'TipoAtividadeAPR', 'TipoDeslocamento', 'FrequenciaAtividadeAPR', 'SistemaProtecaoQuedasAPR', 'MetodoAcessoAPR', 'EnergiasAPR', 'RiscosOcupacionaisAPR', 'RiscosAmbientaisAPR'],
-      'Support Tickets': ['StatusChamado', 'Prioridade', 'ChamadoCategoria', 'Chamado', 'ChamadoComentario', 'ChamadoLog']
+      'Support Tickets': ['StatusChamado', 'Prioridade', 'ChamadoCategoria', 'Chamado', 'ChamadoComentario', 'ChamadoLog', 'ChamadoDefeito']
     };
     
     // Create grouped sections

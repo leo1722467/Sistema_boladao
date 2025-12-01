@@ -88,6 +88,21 @@ class NamedEntity(BaseModel):
     nome: Optional[str] = Field(None, description="Entity display name", example="Notebook")
 
 
+class CreateDefeitoRequest(BaseModel):
+    nome: constr(min_length=1, max_length=200) = Field(...)
+    tipo_ativo_id: int = Field(..., gt=0)
+
+
+class DefeitoResponse(BaseModel):
+    id: int = Field(...)
+    nome: str = Field(...)
+    tipo_ativo: NamedEntity | None = Field(None)
+
+
+class DefeitoListResponse(BaseModel):
+    defeitos: List[DefeitoResponse] = Field(...)
+
+
 class AssetSummary(BaseModel):
     """Summary model for asset information."""
     

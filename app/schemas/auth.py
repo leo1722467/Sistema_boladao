@@ -56,3 +56,4 @@ class MeResponse(BaseModel):
     nome: str
     email: Optional[EmailStr]
     ativo: bool
+    contato_id: Optional[int]

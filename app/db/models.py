@@ -161,6 +161,7 @@ class TipoAtivo(Base):
     nome: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
 
     ativos = relationship("Ativo", back_populates="tipo")
+    defeitos = relationship("ChamadoDefeito", back_populates="tipo_ativo")
 
 
 class AcessoAtivo(Base):
@@ -170,6 +171,19 @@ class AcessoAtivo(Base):
     nome: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
 
     ativos = relationship("Ativo", back_populates="acesso")
+
+
+class ChamadoDefeito(Base):
+    __tablename__ = "chamado_defeito"
+    __table_args__ = (
+        UniqueConstraint("tipo_ativo_id", "nome", name="uq_chamado_defeito_tipo_nome"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    tipo_ativo_id: Mapped[int] = mapped_column(ForeignKey("tipo_ativo.id"), nullable=False, index=True)
+
+    tipo_ativo = relationship("TipoAtivo", back_populates="defeitos")
 
 
 class LocalInstalacao(Base):

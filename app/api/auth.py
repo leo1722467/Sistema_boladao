@@ -81,7 +81,7 @@ async def me(current_user: UserAuth = Depends(get_current_user), session: AsyncS
     """Return current authenticated user info."""
 
     contato: Optional[Contato] = await session.get(Contato, current_user.contato_id)
-    return MeResponse(id=current_user.id, nome=contato.nome if contato else "", email=contato.email if contato else None, ativo=current_user.ativo)
+    return MeResponse(id=current_user.id, nome=contato.nome if contato else "", email=contato.email if contato else None, ativo=current_user.ativo, contato_id=current_user.contato_id)
 
 
 # Early definition to satisfy Depends() during decoration
@@ -121,4 +121,5 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
         nome=contato.nome if contato else payload.nome,
         email=contato.email if contato else payload.email,
         ativo=auth.ativo,
+        contato_id=auth.contato_id,
     )
