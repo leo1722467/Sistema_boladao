@@ -599,9 +599,13 @@ class ChamadoCategoria(Base):
 
 class Chamado(Base):
     __tablename__ = "chamado"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "numero", name="uq_chamado_empresa_numero"),
+    )
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
-    numero: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    numero: Mapped[str] = mapped_column(Text, nullable=False)
+    origem: Mapped[str | None] = mapped_column(Text, nullable=True)
     empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
     titulo: Mapped[str] = mapped_column(Text, nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text)
@@ -655,3 +659,24 @@ class ChamadoLog(Base):
 
     chamado = relationship("Chamado", back_populates="logs")
     contato = relationship("Contato", back_populates="logs_chamado")
+class TicketSequence(Base):
+    __tablename__ = "ticket_sequence"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "origin", name="uq_ticket_sequence_empresa_origin"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    origin: Mapped[str] = mapped_column(Text, nullable=False)
+    next_value: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class TicketCounter(Base):
+    __tablename__ = "ticket_counter"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", name="uq_ticket_counter_empresa"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    next_value: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

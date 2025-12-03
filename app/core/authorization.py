@@ -167,6 +167,10 @@ async def get_authorization_context(
     try:
         role = await get_user_role(session, user)
         permissions = ROLE_PERMISSIONS.get(role, [])
+        # Empresa ID 1 has full rights: elevate to ADMIN
+        if tenant and getattr(tenant, 'empresa_id', None) == 1:
+            role = UserRole.ADMIN
+            permissions = ROLE_PERMISSIONS.get(UserRole.ADMIN, [])
         return AuthorizationContext(user=user, tenant=tenant, role=role, permissions=permissions)
     except Exception as e:
         logger.error(f"Error creating authorization context: {e}")

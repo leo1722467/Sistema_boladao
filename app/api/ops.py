@@ -155,3 +155,10 @@ async def get_deployment_status(auth_context: AuthorizationContext = Depends(get
             "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
         },
     }
+
+
+# Test endpoint to intentionally raise an internal error for verification
+@router.get("/test/raise_error")
+@require_role(UserRole.ADMIN)
+async def raise_internal_error(auth_context: AuthorizationContext = Depends(get_authorization_context)) -> Dict[str, Any]:
+    raise RuntimeError("Simulated internal server error for logging verification")

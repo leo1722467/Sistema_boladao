@@ -797,8 +797,8 @@
         <h1 class="page-title">Gestão de Chamados</h1>
       </div>
       <div class="user-menu">
-        <span>Bem-vindo, Usuário</span>
-        <div class="user-avatar">U</div>
+        <span id="userGreeting">Bem-vindo, Usuário</span>
+        <div class="user-avatar" id="userAvatar">U</div>
         <a href="/web/logout" class="btn btn-primary">
           <i class="fas fa-sign-out-alt"></i>
           Sair
@@ -986,6 +986,7 @@
         return;
       }
       initializeEventListeners();
+      loadUserGreeting();
       loadTicketStats();
       loadTickets();
     });
@@ -1022,6 +1023,22 @@
       
       sidebar.classList.toggle('collapsed');
       mainContent.classList.toggle('expanded');
+    }
+
+    async function loadUserGreeting() {
+      try {
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+        const meResp = await fetch('/auth/me', { credentials: 'include', headers });
+        if (meResp.ok) {
+          const me = await meResp.json();
+          const nome = me?.nome || me?.user?.nome || me?.email || 'Usuário';
+          document.getElementById('userGreeting').textContent = `Bem-vindo, ${nome}`;
+          const initial = String(nome).trim().charAt(0).toUpperCase() || 'U';
+          document.getElementById('userAvatar').textContent = initial;
+        }
+      } catch {}
     }
 
     async function loadTicketStats() {
@@ -1197,6 +1214,18 @@
                     <button class="action-btn workflow" onclick="showWorkflow(${ticket.id})" title="Workflow">
                       <i class="fas fa-project-diagram"></i>
                     </button>
+                    <button class="action-btn" style="background:#e3ffe3;color:#2e7d32" onclick="assignToMe(${ticket.id})" title="Atribuir para mim">
+                      <i class="fas fa-user-check"></i>
+                    </button>
+                    <button class="action-btn" style="background:#e3f2fd;color:#1976d2" onclick="changeStatus(${ticket.id}, 'in_progress')" title="Mover para Em Andamento">
+                      <i class="fas fa-play"></i>
+                    </button>
+                    <button class="action-btn" style="background:#fff3e0;color:#f57c00" onclick="changeStatus(${ticket.id}, 'pending_customer')" title="Aguardando Cliente">
+                      <i class="fas fa-user-clock"></i>
+                    </button>
+                    <button class="action-btn" style="background:#d4edda;color:#155724" onclick="resolveTicket(${ticket.id})" title="Resolver">
+                      <i class="fas fa-check"></i>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -1347,102 +1376,164 @@
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         const response = await fetch(`/api/helpdesk/tickets/${id}`, { credentials: 'include', headers });
         
+        let ticket;
         if (!response.ok) {
-          let msg = 'Erro ao carregar chamado';
-          try {
-            const err = await response.json();
-            if (response.status === 401) msg = 'Sessão expirada. Faça login novamente.';
-            else if (response.status === 403) msg = 'Sem permissão para visualizar chamado.';
-            else if (response.status === 404) msg = err.detail || 'Chamado não encontrado.';
-            else if (response.status >= 500) msg = 'Erro interno do servidor.';
-          } catch {}
-          throw new Error(msg);
+          // Graceful fallback: use in-memory ticket data when 403/404
+          if (response.status === 403 || response.status === 404) {
+            ticket = currentTickets.find(t => t.id === id);
+            if (!ticket) {
+              let msg = response.status === 403 ? 'Sem permissão para visualizar chamado.' : 'Chamado não encontrado.';
+              throw new Error(msg);
+            }
+          } else if (response.status === 401) {
+            window.location.href = '/';
+            return;
+          } else {
+            throw new Error('Erro interno do servidor ao carregar chamado');
+          }
+        } else {
+          ticket = await response.json();
         }
         
-        const ticket = await response.json();
-        
-        document.getElementById('modalTitle').textContent = `Chamado ${ticket.numero}`;
-        document.getElementById('modalContent').innerHTML = `
-          <div class="form-group">
-            <label class="form-label">Título</label>
-            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
-              ${ticket.titulo}
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">Descrição</label>
-            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; min-height: 100px;">
-              ${ticket.descricao || 'Sem descrição'}
-            </div>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
-            <div class="form-group">
-              <label class="form-label">Status</label>
-              <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
-                <span class="ticket-status ${getStatusClass(ticket.status)}">
-                  ${getStatusLabel(ticket.status)}
-                </span>
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">Prioridade</label>
-              <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
-                <span class="priority-badge ${getPriorityClass(ticket.priority)}">
-                  ${getPriorityLabel(ticket.priority)}
-                </span>
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">Agente</label>
-              <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
-                ${ticket.agente?.nome || 'Não atribuído'}
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">SLA</label>
-              <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
-                <div class="sla-indicator ${getSlaClass(ticket.sla_status)}">
-                  <i class="fas ${getSlaIcon(ticket.sla_status)}"></i>
-                  ${getSlaLabel(ticket.sla_status)}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          ${ticket.next_actions && ticket.next_actions.length > 0 ? `
-            <div class="form-group">
-              <label class="form-label">Próximas Ações Sugeridas</label>
-              <div style="padding: 12px; background: #e8f5e8; border-radius: 8px;">
-                <ul style="margin: 0; padding-left: 20px;">
-                  ${ticket.next_actions.map(action => `<li>${action}</li>`).join('')}
-                </ul>
-              </div>
-            </div>
-          ` : ''}
-          
-          <div class="modal-actions">
-            <button class="btn btn-primary" onclick="editTicket(${id})">
-              <i class="fas fa-edit"></i>
-              Editar
-            </button>
-            <button class="btn btn-secondary" onclick="showWorkflow(${id})">
-              <i class="fas fa-project-diagram"></i>
-              Ver Workflow
-            </button>
-            <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
-          </div>
-        `;
+        renderTicketModal(ticket);
         
         document.getElementById('ticketModal').classList.add('show');
         
       } catch (error) {
         console.error('Error loading ticket:', error);
-        alert('Erro ao carregar chamado');
+        alert(error.message || 'Erro ao carregar chamado');
+      }
+    }
+
+    function renderTicketModal(ticket) {
+      document.getElementById('modalTitle').textContent = `Chamado ${ticket.numero}`;
+      const comments = ticket.comentarios || [];
+      document.getElementById('modalContent').innerHTML = `
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+            ${ticket.titulo}
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; min-height: 100px;">
+            ${ticket.descricao || 'Sem descrição'}
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+              <span class="ticket-status ${getStatusClass(ticket.status)}">
+                ${getStatusLabel(ticket.status)}
+              </span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Prioridade</label>
+            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+              <span class="priority-badge ${getPriorityClass(ticket.priority)}">
+                ${getPriorityLabel(ticket.priority)}
+              </span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Agente</label>
+            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+              ${ticket.agente?.nome || 'Não atribuído'}
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">SLA</label>
+            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+              <div class="sla-indicator ${getSlaClass(ticket.sla_status)}">
+                <i class="fas ${getSlaIcon(ticket.sla_status)}"></i>
+                ${getSlaLabel(ticket.sla_status)}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Comentários</label>
+          <div style="padding: 12px; background: #f8f9fa; border-radius: 8px;">
+            ${comments.length === 0 ? '<em>Sem comentários</em>' : `
+              <ul style="margin:0; padding-left: 20px;">
+                ${comments.map(c => `
+                  <li>
+                    <strong>${(c.contato && c.contato.nome) ? c.contato.nome : 'Anônimo'}</strong>
+                    <small style="color:#777;">${formatDate(c.data_hora || new Date().toISOString())}</small><br>
+                    ${c.comentario || ''}
+                  </li>
+                `).join('')}
+              </ul>
+            `}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Adicionar comentário</label>
+          <textarea id="newCommentInput" class="form-textarea" placeholder="Escreva seu comentário..."></textarea>
+          <div class="modal-actions" style="justify-content:flex-start;">
+            <button class="btn btn-success" onclick="addComment(${ticket.id})"><i class="fas fa-comment-dots"></i> Enviar comentário</button>
+          </div>
+        </div>
+
+        ${ticket.next_actions && ticket.next_actions.length > 0 ? `
+          <div class="form-group">
+            <label class="form-label">Próximas Ações Sugeridas</label>
+            <div style="padding: 12px; background: #e8f5e8; border-radius: 8px;">
+              <ul style="margin: 0; padding-left: 20px;">
+                ${(ticket.next_actions || []).map(a => {
+                  const label = typeof a === 'string' ? a : (a.description || a.label || a.action || JSON.stringify(a));
+                  return `<li>${label}</li>`;
+                }).join('')}
+              </ul>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="modal-actions">
+          <button class="btn btn-primary" onclick="editTicket(${ticket.id})">
+            <i class="fas fa-edit"></i>
+            Editar
+          </button>
+          <button class="btn btn-secondary" onclick="showWorkflow(${ticket.id})">
+            <i class="fas fa-project-diagram"></i>
+            Ver Workflow
+          </button>
+          <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
+        </div>
+      `;
+    }
+
+    async function addComment(id) {
+      try {
+        const comment = document.getElementById('newCommentInput').value.trim();
+        if (!comment) { alert('Digite um comentário'); return; }
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const r = await fetch(`/api/helpdesk/tickets/${id}`, {
+          method: 'PUT', credentials: 'include', headers, body: JSON.stringify({ comment })
+        });
+        if (!r.ok) {
+          let msg = 'Falha ao adicionar comentário';
+          try { const err = await r.json(); msg = err.detail || msg; } catch {}
+          throw new Error(msg);
+        }
+        const updated = await r.json();
+        renderTicketModal(updated);
+        document.getElementById('newCommentInput').value = '';
+      } catch (e) {
+        alert(e.message || 'Erro ao adicionar comentário');
       }
     }
 
@@ -1518,6 +1609,66 @@
       loadTicketStats();
       loadTickets(currentPage);
     }, 2 * 60 * 1000);
+  </script>
+  <script>
+    async function apiHeaders() {
+      const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+      const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+
+    async function getMe() {
+      const headers = await apiHeaders();
+      const r = await fetch('/auth/me', { credentials: 'include', headers });
+      if (!r.ok) throw new Error('Falha ao carregar usuário');
+      return await r.json();
+    }
+
+    async function assignToMe(id) {
+      try {
+        const me = await getMe();
+        const headers = await apiHeaders();
+        const r = await fetch(`/api/helpdesk/tickets/${id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify({ agente_contato_id: me.contato_id, comment: 'Atribuído para mim' })
+        });
+        if (!r.ok) throw new Error('Falha ao atribuir');
+        await loadTickets(currentPage);
+      } catch (e) { alert(e.message || 'Erro ao atribuir'); }
+    }
+
+    async function changeStatus(id, status) {
+      try {
+        const headers = await apiHeaders();
+        const r = await fetch(`/api/helpdesk/tickets/${id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify({ status: status })
+        });
+        if (!r.ok) throw new Error('Falha ao alterar status');
+        await loadTickets(currentPage);
+      } catch (e) { alert(e.message || 'Erro ao alterar status'); }
+    }
+
+    async function resolveTicket(id) {
+      const comment = prompt('Adicionar comentário de resolução (opcional):');
+      try {
+        const headers = await apiHeaders();
+        const r = await fetch(`/api/helpdesk/tickets/${id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify({ status: 'resolved', comment: comment || '' })
+        });
+        if (!r.ok) throw new Error('Falha ao resolver chamado');
+        await loadTickets(currentPage);
+      } catch (e) { alert(e.message || 'Erro ao resolver chamado'); }
+    }
   </script>
 </body>
 </html>

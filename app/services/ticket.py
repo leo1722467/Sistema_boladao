@@ -26,11 +26,51 @@ class TicketService:
         self.repo = ChamadoRepository()
         self.workflow = TicketWorkflowEngine()
 
-    def _gen_number(self, empresa_id: int) -> str:
-        """Generate a unique ticket number."""
-        timestamp = int(time.time())
-        random_part = random.randint(1000, 9999)
-        return f"TKT-{empresa_id}-{timestamp}-{random_part}"
+    async def _get_next_counter(self, session: AsyncSession, empresa_id: int) -> int:
+        from sqlalchemy import select, update, insert
+        from app.db.models import TicketCounter, Chamado
+        row = await session.execute(select(TicketCounter).where(TicketCounter.empresa_id == empresa_id))
+        counter = row.scalars().first()
+
+        # Determine max in new format: E{empresa}{ORIGIN}-{N}
+        import re as _re
+        pat = _re.compile(rf"^E{empresa_id}[A-Z]+-(\d+)$")
+        nums_res = await session.execute(select(Chamado.numero).where(Chamado.empresa_id == empresa_id))
+        max_n = 0
+        for (num_str,) in nums_res.all():
+            if not isinstance(num_str, str):
+                continue
+            m = pat.match(num_str.strip())
+            if not m:
+                continue
+            try:
+                n = int(m.group(1))
+                if n > max_n:
+                    max_n = n
+            except Exception:
+                continue
+
+        if not counter:
+            next_val = (max_n + 1) if max_n else 1
+            await session.execute(insert(TicketCounter).values(empresa_id=empresa_id, next_value=next_val))
+            await session.flush()
+            await session.execute(update(TicketCounter).where(TicketCounter.empresa_id == empresa_id).values(next_value=next_val + 1))
+            return next_val
+
+        # If no new-format tickets exist, reset counter to 1
+        if max_n == 0:
+            await session.execute(update(TicketCounter).where(TicketCounter.id == counter.id).values(next_value=2))
+            return 1
+
+        # Otherwise, ensure we continue from max_n + 1
+        next_val = max(counter.next_value or 1, max_n + 1)
+        await session.execute(update(TicketCounter).where(TicketCounter.id == counter.id).values(next_value=next_val + 1))
+        return next_val
+
+    async def _gen_number(self, session: AsyncSession, empresa_id: int, origin: str) -> str:
+        prefix = "WEB" if origin.lower() == "web" else ("WPP" if origin.lower() == "wpp" else origin.upper())
+        seq = await self._get_next_counter(session, empresa_id)
+        return f"E{empresa_id}{prefix}-{seq}"
 
     async def create_with_asset(
         self,
@@ -43,6 +83,7 @@ class TicketService:
         prioridade_id: Optional[int] = None,
         status_id: Optional[int] = None,
         categoria_id: Optional[int] = None,
+        origem: str = "web",
     ) -> Chamado:
         """
         Create a new ticket with comprehensive validation and workflow initialization.
@@ -75,7 +116,7 @@ class TicketService:
             if ativo_id:
                 from app.repositories.ativo import AtivoRepository
                 ativo_repo = AtivoRepository()
-                ativo = await ativo_repo.get_by_id(session, ativo_id)
+                ativo = await ativo_repo.get_by_id(session, empresa_id, ativo_id)
                 if not ativo or ativo.empresa_id != empresa_id:
                     raise TenantScopeError(
                         "Asset does not belong to the current company",
@@ -87,22 +128,37 @@ class TicketService:
                 new_status = await self._get_default_status(session, "open")
                 status_id = new_status.id if new_status else None
             
-            # Generate unique ticket number
-            numero = self._gen_number(empresa_id)
+            # Generate sequential ticket number per origin
+            numero = await self._gen_number(session, empresa_id, origem)
             
             # Create the ticket
-            ticket = await self.repo.create(
-                session=session,
-                empresa_id=empresa_id,
-                numero=numero,
-                ativo_id=ativo_id,
-                titulo=titulo.strip(),
-                descricao=descricao,
-                categoria_id=categoria_id,
-                prioridade_id=prioridade_id,
-                status_id=status_id,
-                requisitante_contato_id=solicitante_id,
-            )
+            attempts = 0
+            from sqlalchemy.exc import IntegrityError
+            while True:
+                try:
+                    ticket = await self.repo.create(
+                        session=session,
+                        empresa_id=empresa_id,
+                        numero=numero,
+                        ativo_id=ativo_id,
+                        titulo=titulo.strip(),
+                        descricao=descricao,
+                        categoria_id=categoria_id,
+                        prioridade_id=prioridade_id,
+                        status_id=status_id,
+                        requisitante_contato_id=solicitante_id,
+                        # set origin field for tracking
+                        agente_contato_id=None,
+                        proprietario_contato_id=None,
+                        origem=origem,
+                    )
+                    break
+                except IntegrityError:
+                    attempts += 1
+                    await session.rollback()
+                    if attempts > 5:
+                        raise
+                    numero = await self._gen_number(session, empresa_id, origem)
             
             # Log ticket creation
             await self._log_ticket_action(
@@ -444,10 +500,27 @@ class TicketService:
         self.workflow.validate_transition(current_status, new_status_enum, user_role, comment)
 
     async def _get_default_status(self, session: AsyncSession, status_name: str) -> Optional[StatusChamado]:
-        """Get a status by name."""
-        stmt = select(StatusChamado).where(StatusChamado.nome.ilike(f"%{status_name}%"))
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        """Get a status by name (supports EN/PT)."""
+        # Try exact English
+        result = await session.execute(select(StatusChamado).where(StatusChamado.nome == status_name))
+        status = result.scalars().first()
+        if status:
+            return status
+        # Try exact Portuguese common label
+        if status_name.lower() == "open":
+            result_pt = await session.execute(select(StatusChamado).where(StatusChamado.nome == "Aberto"))
+            status = result_pt.scalars().first()
+            if status:
+                return status
+        # Fallback contains
+        result2 = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike(f"%{status_name}%")))
+        status = result2.scalars().first()
+        if status:
+            return status
+        if status_name.lower() == "open":
+            result2_pt = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike("%aberto%")))
+            return result2_pt.scalars().first()
+        return None
 
     async def _add_comment(
         self,

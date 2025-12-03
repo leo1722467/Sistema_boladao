@@ -38,10 +38,12 @@ class ChamadoRepository:
         requisitante_contato_id: Optional[int] = None,
         agente_contato_id: Optional[int] = None,
         proprietario_contato_id: Optional[int] = None,
+        origem: Optional[str] = None,
     ) -> Chamado:
         entity = Chamado(
             empresa_id=empresa_id,
             numero=numero,
+            origem=(origem.lower() if origem else None),
             ativo_id=ativo_id,
             titulo=titulo,
             descricao=descricao,

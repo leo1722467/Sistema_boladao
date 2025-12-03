@@ -132,9 +132,21 @@
       const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='))
       if (!hasToken) { window.location.href = '/'; return }
       document.getElementById('menuToggle').addEventListener('click', toggleSidebar)
+      window.addEventListener('error', (e) => { try { console.error('Unhandled error:', e.message, e.error || null) } catch {} })
+      window.addEventListener('unhandledrejection', (e) => { try { console.error('Unhandled rejection:', e.reason) } catch {} })
       await loadOptions()
       document.getElementById('createTicketBtn').addEventListener('click', submitTicket)
     })
+
+    async function logFetchError(res, url, payload) {
+      try {
+        const ct = res.headers.get('content-type') || ''
+        const body = ct.includes('application/json') ? await res.json() : await res.text()
+        console.error('Fetch error', { url, status: res.status, statusText: res.statusText, payload, body })
+      } catch (err) {
+        console.error('Fetch error (body parse failed)', { url, status: res.status, statusText: res.statusText, payload })
+      }
+    }
 
     function toggleSidebar() {
       const sidebar = document.getElementById('sidebar')
@@ -172,6 +184,11 @@
         localOpts = localRes.ok ? await localRes.json() : []
         const atRes = await fetch('/api/helpdesk/assets', { credentials: 'include', headers })
         atOpts = atRes.ok ? await atRes.json() : []
+        if (!meRes.ok) await logFetchError(meRes, '/auth/me')
+        if (!prRes.ok) await logFetchError(prRes, '/admin/Prioridade/items')
+        if (!tipoRes.ok) await logFetchError(tipoRes, '/admin/TipoAtivo/items')
+        if (!localRes.ok) await logFetchError(localRes, '/admin/LocalInstalacao/items')
+        if (!atRes.ok) await logFetchError(atRes, '/api/helpdesk/assets')
         renderOptionGrids()
       } catch (e) {
         console.error('Erro ao carregar opções', e)
@@ -246,8 +263,10 @@
         if (res.ok) {
           defeitoOpts = (await res.json()).defeitos
         } else {
+          await logFetchError(res, `/api/helpdesk/defeitos?tipo_ativo_id=${tipoId}`)
           res = await fetch('/admin/ChamadoDefeito/items', { credentials: 'include', headers })
           const all = res.ok ? await res.json() : []
+          if (!res.ok) await logFetchError(res, '/admin/ChamadoDefeito/items')
           defeitoOpts = all.filter(d => String(d.tipo_ativo_id) === String(tipoId)).map(d => ({ id: d.id, nome: d.nome }))
         }
       } catch (e) { defeitoOpts = [] }
@@ -276,15 +295,25 @@
         }
         const res = await fetch('/api/helpdesk/tickets', { method: 'POST', credentials: 'include', headers, body: JSON.stringify(payload) })
         if (!res.ok) {
+          await logFetchError(res, '/api/helpdesk/tickets', payload)
           let msg = 'Erro ao criar chamado'
-          try { const err = await res.json(); if (res.status === 401) msg = 'Sessão expirada. Faça login novamente.'; else if (res.status === 403) msg = 'Sem permissão para criar chamado.'; else if (res.status === 400) msg = err.detail || 'Dados inválidos.'; } catch {}
+          try {
+            const ct = res.headers.get('content-type') || ''
+            const err = ct.includes('application/json') ? await res.json() : await res.text()
+            const detail = (typeof err === 'string') ? err : (err && err.detail)
+            if (res.status === 401) msg = 'Sessão expirada. Faça login novamente.'
+            else if (res.status === 403) msg = 'Sem permissão para criar chamado.'
+            else if (detail) msg = detail
+          } catch {}
           throw new Error(msg)
         }
         const data = await res.json()
+        console.info('Chamado criado com sucesso', data)
         document.getElementById('resultBox').style.display = 'block'
         document.getElementById('resultBox').innerHTML = `<i class="fas fa-check-circle"></i><h3>Chamado criado</h3><p>Número: ${data.numero || data.id} · Título: ${data.titulo}</p>`
         setTimeout(() => { window.location.href = '/tickets' }, 900)
       } catch (error) {
+        console.error('Falha ao criar chamado', error)
         const box = document.getElementById('resultBox')
         box.style.display = 'block'
         box.innerHTML = `<i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>${error.message}</p>`

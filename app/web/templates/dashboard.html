@@ -545,8 +545,8 @@
         <i class="fas fa-bars"></i>
       </button>
       <div class="user-menu">
-        <span>Bem-vindo, Usuário</span>
-        <div class="user-avatar">U</div>
+        <span id="userGreeting">Bem-vindo, Usuário</span>
+        <div class="user-avatar" id="userAvatar">U</div>
         <a href="/web/logout" class="btn btn-primary">
           <i class="fas fa-sign-out-alt"></i>
           Sair
@@ -748,6 +748,18 @@
           const assetData = await assetResponse.json();
           document.getElementById('activeAssets').textContent = assetData.total || 0;
         }
+
+        // Load current user for greeting
+        try {
+          const meResp = await fetch('/auth/me', { credentials: 'include', headers: { ...headers, 'Content-Type': 'application/json' } });
+          if (meResp.ok) {
+            const me = await meResp.json();
+            const nome = me?.nome || me?.user?.nome || me?.email || 'Usuário';
+            document.getElementById('userGreeting').textContent = `Bem-vindo, ${nome}`;
+            const initial = String(nome).trim().charAt(0).toUpperCase() || 'U';
+            document.getElementById('userAvatar').textContent = initial;
+          }
+        } catch {}
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       }

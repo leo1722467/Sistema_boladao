@@ -282,6 +282,7 @@ async def get_foreign_key_options(
     model: str, 
     field: str, 
     session: AsyncSession = Depends(get_db),
+    empresa_id: Optional[int] = None,
     _: Any = Depends(get_current_user_any)
 ) -> List[Dict[str, Any]]:
     """Get foreign key options for a specific field.
@@ -313,8 +314,14 @@ async def get_foreign_key_options(
         display_field = _get_display_field(target_model)
         pk_field = _pk_column(target_model)
         
-        # Fetch all records from target model
-        res = await session.execute(select(target_model).limit(1000))
+        # Build query, optionally filter by empresa_id when applicable
+        q = select(target_model).limit(1000)
+        try:
+            if empresa_id is not None and hasattr(target_model, 'empresa_id'):
+                q = select(target_model).where(getattr(target_model, 'empresa_id') == empresa_id).limit(1000)
+        except Exception:
+            pass
+        res = await session.execute(q)
         records = res.scalars().all()
         
         options = []

@@ -121,3 +121,9 @@ async def logout() -> RedirectResponse:
 async def ticket_create_page(request: Request) -> HTMLResponse:
     """Render new ticket creation page."""
     return templates.TemplateResponse("ticket_create.html", {"request": request})
+
+
+@router.get("/admin/chamado/{ticket_id}/edit", response_class=HTMLResponse)
+async def ticket_edit_page(ticket_id: int, request: Request) -> HTMLResponse:
+    """Render ticket edit page for a given ticket id."""
+    return templates.TemplateResponse("ticket_edit.html", {"request": request, "ticket_id": ticket_id})

@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 
 from app.db.session import get_db
@@ -225,58 +226,62 @@ async def create_ticket(
     tenant: TenantContext = Depends(get_tenant_context),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> TicketDetailResponse:
-    ativo_id: Optional[int] = payload.ativo_id
-    if not ativo_id and payload.serial_text:
-        # Resolve by serial_text within empresa
-        repo = AtivoRepository()
-        a = await repo.get_by_serial_text(session, tenant.empresa_id, payload.serial_text)
-        if a:
-            ativo_id = a.id
-    # Build ticket
-    if payload.titulo is None or payload.titulo.strip() == "":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Titulo é obrigatório")
-
-    # Map textual priority/status to IDs if numeric not provided
-    prioridade_id = payload.prioridade_id
-    # Always start as 'Aberto' (open)
-    status_id = None
     try:
-        if not prioridade_id:
-            # prefer explicit 'prioridade' then 'priority'
-            pr_text = (payload.prioridade or payload.priority or "").strip().lower()
-            if pr_text:
-                result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{pr_text}%")))
-                prow = result.scalars().first()
-                if prow:
-                    prioridade_id = prow.id
-        # status_id remains None to let service set 'open'
-    except Exception:
-        # If mapping fails, continue with provided IDs/defaults
-        pass
+        ativo_id: Optional[int] = payload.ativo_id
+        if not ativo_id and payload.serial_text:
+            repo = AtivoRepository()
+            a = await repo.get_by_serial_text(session, tenant.empresa_id, payload.serial_text)
+            if a:
+                ativo_id = a.id
+        if payload.titulo is None or payload.titulo.strip() == "":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Titulo é obrigatório")
 
-    ticket_svc = TicketService()
-    ticket = await ticket_svc.create_with_asset(
-        session=session,
-        empresa_id=tenant.empresa_id,
-        solicitante_id=payload.solicitante_id or tenant.contato_id,
-        ativo_id=ativo_id,
-        titulo=payload.titulo,
-        descricao=payload.descricao,
-        prioridade_id=prioridade_id,
-        status_id=status_id,
-        categoria_id=payload.categoria_id,
-    )
-    await session.commit()
-    # Ensure relations are loaded for response building
-    try:
-        await session.refresh(ticket, ['status', 'prioridade', 'categoria', 'requisitante', 'agente'])
-    except Exception:
-        pass
-    # Return full detail for UI/tests
-    detail = await _build_ticket_detail_response(
-        session, ticket, auth_context.role, include_sla=True, include_actions=False
-    )
-    return detail
+        prioridade_id = payload.prioridade_id
+        status_id = None
+        try:
+            if not prioridade_id:
+                pr_text = (payload.prioridade or payload.priority or "").strip().lower()
+                if pr_text:
+                    result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{pr_text}%")))
+                    prow = result.scalars().first()
+                    if prow:
+                        prioridade_id = prow.id
+        except Exception:
+            pass
+
+        ticket_svc = TicketService()
+        ticket = await ticket_svc.create_with_asset(
+            session=session,
+            empresa_id=tenant.empresa_id,
+            solicitante_id=payload.solicitante_id or tenant.contato_id,
+            ativo_id=ativo_id,
+            titulo=payload.titulo,
+            descricao=payload.descricao,
+            prioridade_id=prioridade_id,
+            status_id=status_id,
+            categoria_id=payload.categoria_id,
+            origem=(payload.origem or "web"),
+        )
+        await session.commit()
+        try:
+            await session.refresh(ticket, ['status', 'prioridade', 'categoria', 'requisitante', 'agente', 'comentarios'])
+        except Exception:
+            pass
+        detail = await _build_ticket_detail_response(
+            session, ticket, auth_context.role, include_sla=True, include_actions=False
+        )
+        return detail
+    except BusinessLogicError as e:
+        logger.warning(f"Business error creating ticket: {e}")
+        raise business_exception_to_http(e)
+    except HTTPException:
+        raise
+    except IntegrityError as e:
+        logger.exception(f"DB integrity error in create_ticket: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"IntegrityError: {str(e)}")
+    except Exception as e:
+        logger.exception(f"Unexpected error in create_ticket: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e.__class__.__name__}: {str(e)}")
 
 
 @router.post("/service-orders", response_model=CreateServiceOrderResponse)
@@ -461,10 +466,10 @@ async def list_tickets(
     description="Retrieve detailed information about a specific ticket including SLA status and suggested next actions."
 )
 async def get_ticket(
-    ticket_id: int,
-    session: AsyncSession = Depends(get_db),
-    auth_context: AuthorizationContext = Depends(get_authorization_context),
-) -> TicketDetailResponse:
+        ticket_id: int,
+        session: AsyncSession = Depends(get_db),
+        auth_context: AuthorizationContext = Depends(get_authorization_context),
+    ) -> TicketDetailResponse:
     """
     Get detailed ticket information with workflow context.
     """
@@ -495,7 +500,11 @@ async def get_ticket(
                     detail="You can only view your own tickets"
                 )
         
-        # Build detailed response
+        # Build detailed response (include comments)
+        try:
+            await session.refresh(ticket, ['comentarios'])
+        except Exception:
+            pass
         ticket_detail = await _build_ticket_detail_response(
             session, ticket, auth_context.role, include_sla=True, include_actions=True
         )
@@ -608,6 +617,10 @@ async def update_ticket(
         await session.commit()
         
         # Build response with updated information
+        try:
+            await session.refresh(updated_ticket, ['comentarios'])
+        except Exception:
+            pass
         ticket_detail = await _build_ticket_detail_response(
             session, updated_ticket, auth_context.role, include_sla=True, include_actions=True
         )
@@ -701,6 +714,37 @@ async def _build_ticket_detail_response(
     """Helper function to build detailed ticket response."""
     from app.core.ticket_workflow import TicketWorkflowEngine
     from datetime import datetime
+    # Safely load relations to prevent async lazy-load MissingGreenlet
+    try:
+        from app.db.models import StatusChamado, Prioridade, ChamadoCategoria, Contato, Ativo
+    except Exception:
+        StatusChamado = Prioridade = ChamadoCategoria = Contato = Ativo = None  # type: ignore
+    try:
+        await session.refresh(ticket, ["status", "prioridade", "categoria", "requisitante", "agente", "ativo", "comentarios"])
+    except Exception:
+        pass
+    status_rel = getattr(ticket, "status", None)
+    prioridade_rel = getattr(ticket, "prioridade", None)
+    categoria_rel = getattr(ticket, "categoria", None)
+    requisitante_rel = getattr(ticket, "requisitante", None)
+    agente_rel = getattr(ticket, "agente", None)
+    ativo_rel = getattr(ticket, "ativo", None)
+    try:
+        if not status_rel and StatusChamado and getattr(ticket, "status_id", None):
+            status_rel = await session.get(StatusChamado, ticket.status_id)
+        if not prioridade_rel and Prioridade and getattr(ticket, "prioridade_id", None):
+            prioridade_rel = await session.get(Prioridade, ticket.prioridade_id)
+        if not categoria_rel and ChamadoCategoria and getattr(ticket, "categoria_id", None):
+            categoria_rel = await session.get(ChamadoCategoria, ticket.categoria_id)
+        if not requisitante_rel and Contato and getattr(ticket, "requisitante_contato_id", None):
+            requisitante_rel = await session.get(Contato, ticket.requisitante_contato_id)
+        if not agente_rel and Contato and getattr(ticket, "agente_contato_id", None):
+            agente_rel = await session.get(Contato, ticket.agente_contato_id)
+        if not ativo_rel and Ativo and getattr(ticket, "ativo_id", None):
+            ativo_rel = await session.get(Ativo, ticket.ativo_id)
+    except Exception:
+        # If any relation fails to load, continue building with available data
+        pass
     
     # Build basic response
     response_data = {
@@ -708,17 +752,36 @@ async def _build_ticket_detail_response(
         "numero": ticket.numero,
         "titulo": ticket.titulo,
         "descricao": ticket.descricao,
-        "status": (ticket.status.nome.lower() if ticket.status and ticket.status.nome else None),
-        "prioridade": (ticket.prioridade.nome.lower() if ticket.prioridade and ticket.prioridade.nome else None),
-        "priority": (ticket.prioridade.nome.lower() if ticket.prioridade and ticket.prioridade.nome else None),
-        "categoria": ticket.categoria.nome if ticket.categoria else None,
+        "status": (status_rel.nome.lower() if status_rel and getattr(status_rel, "nome", None) else None),
+        "prioridade": (prioridade_rel.nome.lower() if prioridade_rel and getattr(prioridade_rel, "nome", None) else None),
+        "priority": (prioridade_rel.nome.lower() if prioridade_rel and getattr(prioridade_rel, "nome", None) else None),
+        "categoria": (categoria_rel.nome if categoria_rel and getattr(categoria_rel, "nome", None) else None),
         "ativo_id": ticket.ativo_id,
-        "requisitante": ({"id": ticket.requisitante.id, "nome": ticket.requisitante.nome} if ticket.requisitante else None),
-        "agente": ({"id": ticket.agente.id, "nome": ticket.agente.nome} if ticket.agente else None),
+        "requisitante": ({"id": requisitante_rel.id, "nome": requisitante_rel.nome} if requisitante_rel else None),
+        "agente": ({"id": agente_rel.id, "nome": agente_rel.nome} if agente_rel else None),
         "criado_em": ticket.criado_em.isoformat() if ticket.criado_em else None,
         "atualizado_em": ticket.atualizado_em.isoformat() if ticket.atualizado_em else None,
         "fechado_em": ticket.fechado_em.isoformat() if ticket.fechado_em else None,
     }
+    # Add comments history
+    try:
+        comments_list = []
+        for c in getattr(ticket, 'comentarios', []) or []:
+            contato = None
+            try:
+                if getattr(c, 'contato', None) is not None:
+                    contato = {"id": getattr(c.contato, 'id', None), "nome": getattr(c.contato, 'nome', None)}
+            except Exception:
+                contato = None
+            comments_list.append({
+                "id": getattr(c, 'id', None),
+                "contato": contato,
+                "comentario": getattr(c, 'comentario', None),
+                "data_hora": getattr(c, 'data_hora', None).isoformat() if getattr(c, 'data_hora', None) else None,
+            })
+        response_data["comentarios"] = comments_list
+    except Exception:
+        response_data["comentarios"] = []
     
     # Add SLA information if requested
     if include_sla:

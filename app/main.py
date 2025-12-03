@@ -1,6 +1,8 @@
 import logging
+import sys
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
@@ -15,6 +17,9 @@ from app.api.ops import router as ops_router
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
 from app.api.helpdesk import router as helpdesk_router
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.session import get_db
+from app.services.ticket import TicketService
 from app.web.router import router as web_router
 from app.web.admin_router import router as admin_web_router
 
@@ -147,6 +152,72 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["infra"]) 
     async def health():
         return {"status": "ok", "env": settings.ENV}
+
+    # Public test endpoint to trigger an internal error for logging verification
+    @app.get("/test/raise_error_public", tags=["infra"]) 
+    async def raise_error_public():
+        raise RuntimeError("Simulated internal server error for logging verification")
+
+    # Public test endpoint to verify sequential ticket numbers
+    @app.get("/test/create_ticket_seq", tags=["infra"]) 
+    async def test_create_ticket_seq(session: AsyncSession = Depends(get_db), origin: str = "web"):
+        svc = TicketService()
+        ticket = await svc.create_with_asset(
+            session=session,
+            empresa_id=1,
+            titulo="SEQ TEST",
+            descricao="",
+            origem=origin,
+        )
+        await session.commit()
+        return {"numero": ticket.numero, "origem": getattr(ticket, "origem", None)}
+
+    # Global exception handler to log internal server errors to terminal
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logging.getLogger(__name__).exception(
+            "Unhandled exception", extra={
+                "method": request.method,
+                "path": request.url.path,
+            }
+        )
+        print(
+            f"[ERROR] {request.method} {request.url.path} -> {exc.__class__.__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": f"{exc.__class__.__name__}: {str(exc)}",
+                "path": request.url.path,
+            },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        try:
+            status_code = int(getattr(exc, "status_code", 500) or 500)
+        except Exception:
+            status_code = 500
+        if status_code >= 500:
+            logging.getLogger(__name__).error(
+                "HTTP %s at %s %s: %s",
+                status_code,
+                request.method,
+                request.url.path,
+                getattr(exc, "detail", ""),
+            )
+            print(
+                f"[ERROR] {request.method} {request.url.path} -> HTTP {status_code}: {getattr(exc, 'detail', '')}",
+                file=sys.stderr,
+            )
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "detail": str(getattr(exc, "detail", "")),
+                "path": request.url.path,
+            },
+        )
 
     # Startup initializers (migrations, cache)
     @app.on_event("startup")

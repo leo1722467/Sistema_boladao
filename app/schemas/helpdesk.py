@@ -147,6 +147,11 @@ class CreateTicketRequest(BaseModel):
         description="Priority ID (uses default if not provided)",
         example=2
     )
+    origem: Optional[str] = Field(
+        None,
+        description="Ticket origin (e.g., 'web' or 'wpp')",
+        example="web"
+    )
     status: Optional[str] = Field(
         None,
         description="Status (text alias)",
@@ -195,7 +200,8 @@ class CreateTicketRequest(BaseModel):
                 "descricao": "The laptop won't turn on when pressing the power button. No lights or sounds.",
                 "prioridade": "normal",
                 "categoria_id": 3,
-                "ativo_id": 456
+                "ativo_id": 456,
+                "origem": "web"
             }
         }
 
@@ -328,6 +334,7 @@ class TicketDetailResponse(BaseModel):
     fechado_em: Optional[str] = Field(None, description="Closure timestamp")
     sla_status: Optional[str] = Field(None, description="SLA indicator (ok, warning, breach)")
     next_actions: Optional[List[Dict[str, str]]] = Field(None, description="Suggested next actions")
+    comentarios: Optional[List[Dict[str, Any]]] = Field(None, description="Histórico de comentários")
 
     class Config:
         json_schema_extra = {
@@ -347,7 +354,10 @@ class TicketDetailResponse(BaseModel):
             "atualizado_em": "2023-10-31T15:45:00",
             "fechado_em": None,
             "sla_status": "warning",
-            "next_actions": [{"action": "transition_to_in_progress", "description": "Start working on ticket"}]
+            "next_actions": [{"action": "transition_to_in_progress", "description": "Start working on ticket"}],
+            "comentarios": [
+                {"id": 1, "contato": {"id": 12, "nome": "João Silva"}, "comentario": "Detalhe adicional", "data_hora": "2023-10-31T11:00:00"}
+            ]
         }
     }
 
@@ -454,7 +464,7 @@ class TicketListResponse(BaseModel):
     total_pages: Optional[int] = Field(None, description="Total pages based on total and limit")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
         "example": {
             "tickets": [
                 {
@@ -485,7 +495,7 @@ class TicketAnalyticsResponse(BaseModel):
     escalation_recommendations: List[Dict[str, Any]] = Field(..., description="Tickets needing escalation")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "total_tickets": 150,
                 "by_status": {"open": 45, "in_progress": 30, "resolved": 75},
@@ -520,7 +530,7 @@ class ServiceOrderDetailResponse(BaseModel):
     time_tracking: Optional[Dict[str, Any]] = Field(None, description="Time tracking information")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 321,
                 "numero_os": "OS-1-2023-12345",
@@ -585,7 +595,7 @@ class UpdateServiceOrderRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "atividades_realizadas": "Completed hardware replacement and system testing",
                 "observacao": "All systems functioning normally after repair",
@@ -622,7 +632,7 @@ class AddActivityRequest(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "activity_type": "REPAIR",
                 "description": "Replaced faulty motherboard and tested functionality",
@@ -651,7 +661,7 @@ class ServiceOrderFilters(BaseModel):
     offset: Optional[int] = Field(0, ge=0, description="Number of results to skip")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "tipo_os_id": 1,
                 "search": "motherboard",
@@ -672,7 +682,7 @@ class ServiceOrderListResponse(BaseModel):
     total_pages: Optional[int] = Field(None, description="Total pages based on total and limit")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "service_orders": [
                     {
