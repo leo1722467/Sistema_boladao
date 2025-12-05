@@ -160,11 +160,14 @@ class TicketService:
                         raise
                     numero = await self._gen_number(session, empresa_id, origem)
             
-            # Log ticket creation
             await self._log_ticket_action(
-                session, ticket.id, solicitante_id, 
+                session, ticket.id, solicitante_id,
                 "CREATED", f"Ticket created: {titulo}"
             )
+            try:
+                await self._apply_routing_rules(session, ticket)
+            except Exception:
+                pass
             
             logger.info(f"Created ticket {ticket.numero} for empresa {empresa_id}")
             return ticket
@@ -264,11 +267,82 @@ class TicketService:
             if "status_id" in updates:
                 new_status_id = updates["status_id"]
                 if new_status_id != ticket.status_id:
-                    await self._validate_status_transition(
-                        session, ticket, new_status_id, user_role, comment
-                    )
-                    changes["status_id"] = {"from": ticket.status_id, "to": new_status_id}
-            
+                    # Special-case: NEW -> PENDING_CUSTOMER should pass through IN_PROGRESS
+                    try:
+                        current_status_name = ticket.status.nome.lower() if ticket.status else "new"
+                        # Resolve target status name
+                        tgt = await session.get(StatusChamado, new_status_id)
+                        target_name = tgt.nome.lower() if tgt else ""
+                        # Normalize to english labels used by workflow
+                        norm = lambda s: {
+                            "novo": "new",
+                            "new": "new",
+                            "aberto": "open",
+                            "open": "open",
+                            "em andamento": "in_progress",
+                            "em atendimento": "in_progress",
+                            "in_progress": "in_progress",
+                            "em espera": "pending_customer",
+                            "espera": "pending_customer",
+                            "aguardando": "pending_customer",
+                            "aguardando cliente": "pending_customer",
+                            "pending_customer": "pending_customer",
+                            "resolvido": "resolved",
+                            "resolved": "resolved",
+                            "fechado": "closed",
+                            "closed": "closed",
+                        }.get((s or "").strip().lower(), (s or "").strip().lower())
+
+                        cur_code = norm(current_status_name)
+                        tgt_code = norm(target_name)
+
+                        if cur_code == "new" and tgt_code == "pending_customer":
+                            # Business rule: from NEW, move to OPEN first; do NOT jump to PENDING_CUSTOMER
+                            open_status = await self._get_default_status(session, "open")
+                            if open_status:
+                                await self._validate_status_transition(session, ticket, open_status.id, user_role, comment)
+                                if ticket.status_id != open_status.id:
+                                    changes["status_id"] = {"from": ticket.status_id, "to": open_status.id}
+                                    ticket.status_id = open_status.id
+                                    await session.flush()
+                                    try:
+                                        await session.refresh(ticket, ["status"]) 
+                                    except Exception:
+                                        pass
+                            # Do not proceed to pending_customer directly; require further action later
+                            pass
+                        else:
+                            await self._validate_status_transition(
+                                session, ticket, new_status_id, user_role, comment
+                            )
+                            changes["status_id"] = {"from": ticket.status_id, "to": new_status_id}
+                            ticket.status_id = new_status_id
+                            try:
+                                tgt = await session.get(StatusChamado, new_status_id)
+                                tgt_name = (tgt.nome or "").strip().lower() if tgt else ""
+                                if tgt_name in ["in_progress", "em andamento", "em atendimento"]:
+                                    if not ticket.agente_contato_id and user_role in ["admin", "agent"]:
+                                        ticket.agente_contato_id = user_id
+                                        changes["agente_contato_id"] = {"from": None, "to": user_id}
+                            except Exception:
+                                pass
+                    except Exception:
+                        # fall back to single-step validation
+                        await self._validate_status_transition(
+                            session, ticket, new_status_id, user_role, comment
+                        )
+                        changes["status_id"] = {"from": ticket.status_id, "to": new_status_id}
+                        ticket.status_id = new_status_id
+                        try:
+                            tgt = await session.get(StatusChamado, new_status_id)
+                            tgt_name = (tgt.nome or "").strip().lower() if tgt else ""
+                            if tgt_name in ["in_progress", "em andamento", "em atendimento"]:
+                                if not ticket.agente_contato_id and user_role in ["admin", "agent"]:
+                                    ticket.agente_contato_id = user_id
+                                    changes["agente_contato_id"] = {"from": None, "to": user_id}
+                        except Exception:
+                            pass
+
             # Handle assignment changes
             if "agente_contato_id" in updates:
                 new_agent_id = updates["agente_contato_id"]
@@ -299,6 +373,18 @@ class TicketService:
             # Add comment if provided
             if comment and comment.strip():
                 await self._add_comment(session, ticket.id, user_id, comment.strip())
+                # Auto progress status to in_progress when there is activity
+                try:
+                    current_status_name = ticket.status.nome.lower() if ticket.status else "new"
+                    if current_status_name in ["new", "open"]:
+                        target = await self._get_default_status(session, "in_progress")
+                        if target:
+                            await self._validate_status_transition(session, ticket, target.id, user_role, comment)
+                            if ticket.status_id != target.id:
+                                changes["status_id"] = {"from": ticket.status_id, "to": target.id}
+                                ticket.status_id = target.id
+                except Exception:
+                    pass
             
             # Log the update
             if changes:
@@ -479,24 +565,37 @@ class TicketService:
         user_role: str,
         comment: Optional[str] = None
     ) -> None:
-        """Validate a status transition using the workflow engine."""
-        # Get current and new status names
-        current_status_name = ticket.status.nome.lower() if ticket.status else "new"
-        
+        norm = lambda s: {
+            "novo": "new",
+            "new": "new",
+            "aberto": "open",
+            "open": "open",
+            "em andamento": "in_progress",
+            "em atendimento": "in_progress",
+            "in_progress": "in_progress",
+            "em espera": "pending_customer",
+            "espera": "pending_customer",
+            "aguardando": "pending_customer",
+            "aguardando cliente": "pending_customer",
+            "pending_customer": "pending_customer",
+            "resolvido": "resolved",
+            "resolved": "resolved",
+            "fechado": "closed",
+            "closed": "closed",
+        }.get((s or "").strip().lower(), (s or "").strip().lower())
+
+        current_status_name = norm(ticket.status.nome if ticket.status else "new")
         new_status = await session.get(StatusChamado, new_status_id)
         if not new_status:
             raise ValidationError(f"Invalid status ID: {new_status_id}")
-        
-        new_status_name = new_status.nome.lower()
-        
-        # Convert to workflow enum values
+        new_status_name = norm(new_status.nome)
+
         try:
             current_status = TicketStatus(current_status_name)
             new_status_enum = TicketStatus(new_status_name)
         except ValueError as e:
             raise TicketError(f"Invalid status transition: {e}")
-        
-        # Validate transition
+
         self.workflow.validate_transition(current_status, new_status_enum, user_role, comment)
 
     async def _get_default_status(self, session: AsyncSession, status_name: str) -> Optional[StatusChamado]:
@@ -512,6 +611,26 @@ class TicketService:
             status = result_pt.scalars().first()
             if status:
                 return status
+        if status_name.lower() == "in_progress":
+            # Common Portuguese labels: "Em Andamento" or "Em atendimento"
+            result_pt2 = await session.execute(select(StatusChamado).where(StatusChamado.nome == "Em Andamento"))
+            status = result_pt2.scalars().first()
+            if status:
+                return status
+            result_pt3 = await session.execute(select(StatusChamado).where(StatusChamado.nome == "Em atendimento"))
+            status = result_pt3.scalars().first()
+            if status:
+                return status
+        if status_name.lower() == "pending_customer":
+            # Common Portuguese labels for waiting: "Aguardando Cliente", "Em espera"
+            result_wc1 = await session.execute(select(StatusChamado).where(StatusChamado.nome == "Aguardando Cliente"))
+            status = result_wc1.scalars().first()
+            if status:
+                return status
+            result_wc2 = await session.execute(select(StatusChamado).where(StatusChamado.nome == "Em espera"))
+            status = result_wc2.scalars().first()
+            if status:
+                return status
         # Fallback contains
         result2 = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike(f"%{status_name}%")))
         status = result2.scalars().first()
@@ -520,7 +639,159 @@ class TicketService:
         if status_name.lower() == "open":
             result2_pt = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike("%aberto%")))
             return result2_pt.scalars().first()
+        if status_name.lower() == "in_progress":
+            result2_pt2 = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike("%andamento%")))
+            status = result2_pt2.scalars().first()
+            if status:
+                return status
+            result2_pt3 = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike("%atendimento%")))
+            return result2_pt3.scalars().first()
+        if status_name.lower() == "pending_customer":
+            result2_wc1 = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike("%aguardando%")))
+            status = result2_wc1.scalars().first()
+            if status:
+                return status
+            result2_wc2 = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike("%espera%")))
+            return result2_wc2.scalars().first()
         return None
+
+    async def _get_default_priority(self, session: AsyncSession, priority_name: str) -> Optional[Prioridade]:
+        from sqlalchemy import select
+        # Try exact English
+        mapping_en_pt = {
+            "low": "Baixa",
+            "normal": "Normal",
+            "high": "Alta",
+            "urgent": "Urgente",
+        }
+        name = priority_name.strip().lower()
+        # Exact match by English
+        for en, pt in mapping_en_pt.items():
+            if name == en:
+                result = await session.execute(select(Prioridade).where(Prioridade.nome == pt))
+                prow = result.scalars().first()
+                if prow:
+                    return prow
+        # Try exact Portuguese provided
+        result_pt = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{priority_name}%")))
+        prow = result_pt.scalars().first()
+        if prow:
+            return prow
+        # Fallback contains common terms
+        terms = ["baixa", "normal", "alta", "urgente"]
+        for term in terms:
+            result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{term}%")))
+            prow = result.scalars().first()
+            if prow:
+                return prow
+        return None
+
+    async def _apply_routing_rules(self, session: AsyncSession, ticket: Chamado) -> None:
+        from sqlalchemy import select
+        from app.db.models import HelpdeskRoutingRule
+        empresa_id = getattr(ticket, "empresa_id", None) or 1
+        agent_id = None
+        if ticket.categoria_id:
+            res = await session.execute(
+                select(HelpdeskRoutingRule).where(
+                    HelpdeskRoutingRule.empresa_id == empresa_id,
+                    HelpdeskRoutingRule.categoria_id == ticket.categoria_id,
+                    HelpdeskRoutingRule.ativo == True,
+                )
+            )
+            row = res.scalars().first()
+            agent_id = row.agente_contato_id if row else None
+        if not agent_id and ticket.prioridade_id:
+            res2 = await session.execute(
+                select(HelpdeskRoutingRule).where(
+                    HelpdeskRoutingRule.empresa_id == empresa_id,
+                    HelpdeskRoutingRule.prioridade_id == ticket.prioridade_id,
+                    HelpdeskRoutingRule.ativo == True,
+                )
+            )
+            row2 = res2.scalars().first()
+            agent_id = row2.agente_contato_id if row2 else None
+        if not agent_id:
+            res3 = await session.execute(
+                select(HelpdeskRoutingRule).where(
+                    HelpdeskRoutingRule.empresa_id == empresa_id,
+                    HelpdeskRoutingRule.categoria_id.is_(None),
+                    HelpdeskRoutingRule.prioridade_id.is_(None),
+                    HelpdeskRoutingRule.ativo == True,
+                )
+            )
+            row3 = res3.scalars().first()
+            agent_id = row3.agente_contato_id if row3 else None
+        if agent_id:
+            old = ticket.agente_contato_id
+            ticket.agente_contato_id = int(agent_id)
+            if old != ticket.agente_contato_id:
+                await self._log_ticket_action(session, ticket.id, None, "ROUTED", "Ticket routed to agent")
+
+    async def apply_macro(
+        self,
+        session: AsyncSession,
+        empresa_id: int,
+        ticket_id: int,
+        macro_id: int,
+        user_id: int,
+        user_role: str,
+    ) -> Chamado:
+        from sqlalchemy import select
+        from app.db.models import HelpdeskMacro, StatusChamado, ChamadoCategoria, Prioridade
+        ticket = await self.get_by_id(session, empresa_id, ticket_id)
+        if not ticket:
+            raise NotFoundError("Ticket not found", {"ticket_id": ticket_id})
+        res = await session.execute(select(HelpdeskMacro).where(HelpdeskMacro.id == macro_id, HelpdeskMacro.empresa_id == empresa_id))
+        macro = res.scalars().first()
+        if not macro:
+            raise NotFoundError("Macro not found", {"macro_id": macro_id})
+        actions = macro.actions or {}
+        if isinstance(actions, list):
+            seq = actions
+        else:
+            seq = []
+            for k, v in actions.items():
+                seq.append({"type": k, "value": v})
+        for act in seq:
+            t = str(act.get("type") or "").strip().lower()
+            v = act.get("value")
+            if t == "set_status":
+                new_id = None
+                if isinstance(v, int):
+                    new_id = v
+                elif isinstance(v, str) and v.strip():
+                    row = await self._get_default_status(session, v)
+                    new_id = row.id if row else None
+                if new_id:
+                    await self._validate_status_transition(session, ticket, new_id, user_role, None)
+                    ticket.status_id = new_id
+                    try:
+                        tgt = await session.get(StatusChamado, new_id)
+                        tgt_name = (tgt.nome or "").strip().lower() if tgt else ""
+                        if tgt_name in ["in_progress", "em andamento", "em atendimento"] and not ticket.agente_contato_id and user_role in ["admin", "agent"]:
+                            ticket.agente_contato_id = user_id
+                    except Exception:
+                        pass
+            elif t == "add_comment":
+                if isinstance(v, str) and v.strip():
+                    await self._add_comment(session, ticket.id, user_id, v.strip())
+            elif t == "assign_agent":
+                if isinstance(v, int):
+                    ticket.agente_contato_id = v
+            elif t == "set_priority":
+                if isinstance(v, int):
+                    ticket.prioridade_id = v
+                elif isinstance(v, str) and v.strip():
+                    prow = await self._get_default_priority(session, v)
+                    ticket.prioridade_id = prow.id if prow else ticket.prioridade_id
+            elif t == "set_category":
+                if isinstance(v, int):
+                    ticket.categoria_id = v
+            await self._log_ticket_action(session, ticket.id, user_id, "MACRO", t)
+        ticket.atualizado_em = datetime.utcnow()
+        await session.flush()
+        return ticket
 
     async def _add_comment(
         self,

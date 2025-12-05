@@ -127,3 +127,11 @@ async def ticket_create_page(request: Request) -> HTMLResponse:
 async def ticket_edit_page(ticket_id: int, request: Request) -> HTMLResponse:
     """Render ticket edit page for a given ticket id."""
     return templates.TemplateResponse("ticket_edit.html", {"request": request, "ticket_id": ticket_id})
+
+@router.get("/kb", response_class=HTMLResponse)
+async def kb_list_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("kb_list.html", {"request": request})
+
+@router.get("/kb/{article_id}", response_class=HTMLResponse)
+async def kb_article_page(article_id: int, request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("kb_article.html", {"request": request, "article_id": article_id})

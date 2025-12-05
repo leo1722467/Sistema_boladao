@@ -83,6 +83,14 @@ async def chamado_create_flow(request: Request, _: Any = Depends(get_current_use
 
     return templates.TemplateResponse("admin/chamado_create_flow.html", {"request": request})
 
+@router.get("/helpdesk", response_class=HTMLResponse)
+async def admin_helpdesk(request: Request, _: Any = Depends(get_current_user_any)) -> HTMLResponse:
+    return templates.TemplateResponse("admin_helpdesk.html", {"request": request})
+
+@router.get("/kb", response_class=HTMLResponse)
+async def admin_kb(request: Request, _: Any = Depends(get_current_user_any)) -> HTMLResponse:
+    return templates.TemplateResponse("admin_kb.html", {"request": request})
+
 
 @router.get("/{model}", response_class=HTMLResponse)
 async def admin_model_list(model: str, request: Request, _: Any = Depends(get_current_user_any)) -> HTMLResponse:

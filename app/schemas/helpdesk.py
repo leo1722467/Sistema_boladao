@@ -335,6 +335,8 @@ class TicketDetailResponse(BaseModel):
     sla_status: Optional[str] = Field(None, description="SLA indicator (ok, warning, breach)")
     next_actions: Optional[List[Dict[str, str]]] = Field(None, description="Suggested next actions")
     comentarios: Optional[List[Dict[str, Any]]] = Field(None, description="Histórico de comentários")
+    status_id: Optional[int] = Field(None, description="ID do status do chamado")
+    prioridade_id: Optional[int] = Field(None, description="ID da prioridade do chamado")
 
     class Config:
         json_schema_extra = {

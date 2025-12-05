@@ -107,7 +107,7 @@
             <div class="options-grid" id="assetGrid"></div>
           </div>
           <div class="slide"><div class="center-step">Defeito</div><div class="options-grid" id="defeitoGrid"></div></div>
-          <div class="slide"><h3 class="slide-title">Descrição</h3><div class="center-step"><div class="center-box"><div class="square sq-green"><textarea id="descricaoInput" class="textarea" placeholder="Conte os detalhes, sintomas, contexto"></textarea></div></div></div></div>
+          <div class="slide"><h3 class="slide-title">Descrição</h3><div class="center-step"><div class="center-box"><div class="square sq-green"><textarea id="descricaoInput" class="textarea" placeholder="Conte os detalhes, sintomas, contexto"></textarea></div></div></div><div class="square sq-blue" style="margin:12px;"><h3 style="margin-bottom:8px;">Sugestões de Artigos</h3><div id="kbSuggestBox" class="empty-state" style="text-align:left;">Digite o título/descrição para ver sugestões</div></div></div>
           <div class="slide"><div class="center-step">Prioridade</div><div class="options-grid" id="priorityGrid"></div></div>
           <div class="slide"><div class="square sq-blue" style="height:100%;"><h3 style="margin-bottom:8px;">Resumo</h3><div id="summaryBox" class="empty-state" style="padding: 0; text-align: left;"></div><div style="margin-top:12px;"><button id="createTicketBtn" class="btn btn-primary"><i class="fas fa-ticket"></i> Criar Chamado</button></div></div></div>
         </div>
@@ -204,7 +204,7 @@
     const tagEl = document.getElementById('tagInput')
     const descEl = document.getElementById('descricaoInput')
     tagEl.addEventListener('input', () => { filterAssetsByTag(tagEl.value); computeTitle() })
-    descEl.addEventListener('input', () => adjustFont(descEl, 42, 16))
+    descEl.addEventListener('input', () => { adjustFont(descEl, 42, 16); suggestKB() })
     descEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nextSlide() } })
     adjustFont(descEl, 42, 16)
     function renderOptionGrids() {
@@ -277,6 +277,20 @@
       const defeito = (defeitoOpts || []).find(x => x.id === selectedDefeitoId)
       const defeitoLabel = defeito ? defeito.nome : ''
       return [assetLabel, defeitoLabel].filter(Boolean).join(' | ')
+    }
+    async function suggestKB() {
+      try {
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='))
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null
+        const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' }
+        const payload = { titulo: computeTitle(), descricao: descEl.value }
+        const res = await fetch('/api/helpdesk/kb/suggest', { method:'POST', credentials:'include', headers, body: JSON.stringify(payload) })
+        const box = document.getElementById('kbSuggestBox')
+        if (!res.ok) { box.innerHTML = 'Nenhuma sugestão disponível'; return }
+        const items = await res.json()
+        if (!items.length) { box.innerHTML = 'Nenhuma sugestão encontrada'; return }
+        box.innerHTML = items.map(a => `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.15);"><a href="/kb/${a.id}" target="_blank" style="color:#e2e8f0;text-decoration:none;font-weight:600;">${a.titulo}</a><div style="opacity:.8;">${a.resumo||''}</div></div>`).join('')
+      } catch (e) {}
     }
 
     async function submitTicket() {

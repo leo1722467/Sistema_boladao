@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Helpdesk</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f8f9fa; color:#333; line-height:1.6; }
+    .sidebar { position:fixed; left:0; top:0; width:280px; height:100vh; background:linear-gradient(135deg,#2c3e50 0%,#34495e 100%); color:white; z-index:1000; transition:transform .3s ease; overflow-y:auto; }
+    .sidebar.collapsed { transform:translateX(-280px); }
+    .sidebar-header { padding:20px; border-bottom:1px solid rgba(255,255,255,0.1); }
+    .sidebar-header h2 { font-size:24px; font-weight:600; margin-bottom:5px; }
+    .sidebar-header p { font-size:14px; opacity:.8; }
+    .sidebar-nav { padding:20px 0; }
+    .nav-item { display:block; padding:12px 20px; color:white; text-decoration:none; transition:all .3s ease; border-left:3px solid transparent; }
+    .nav-item:hover, .nav-item.active { background:rgba(255,255,255,0.1); border-left-color:#3498db; }
+    .nav-item i { width:20px; margin-right:10px; }
+    .main-content { margin-left:280px; min-height:100vh; transition:margin-left .3s ease; }
+    .main-content.expanded { margin-left:0; }
+    .top-bar { background:white; padding:15px 30px; box-shadow:0 2px 10px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center; }
+    .menu-toggle { background:none; border:none; font-size:20px; cursor:pointer; color:#666; }
+    .user-menu { display:flex; align-items:center; gap:15px; }
+    .user-avatar { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#3498db,#2980b9); display:flex; align-items:center; justify-content:center; color:white; font-weight:600; }
+    .container { padding:30px; max-width:1400px; }
+    .card { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e9ecef; margin-bottom:20px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+    .form-group { flex:1; min-width:220px; }
+    .label { display:block; font-size:13px; color:#666; margin-bottom:6px; }
+    .input, .select, .textarea { width:100%; padding:10px; border:1px solid #e9ecef; border-radius:8px; font-size:14px; }
+    .textarea { min-height:100px; }
+    .actions { display:flex; gap:10px; margin-top:10px; }
+    .btn { display:inline-flex; align-items:center; padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:500; text-decoration:none; cursor:pointer; transition:all .3s ease; }
+    .btn-primary { background:linear-gradient(135deg,#3498db,#2980b9); color:white; }
+    .btn-primary:hover { background:linear-gradient(135deg,#2980b9,#21618c); transform:translateY(-1px); }
+    .btn i { margin-right:8px; }
+    .success { color:#27ae60; margin-top:10px; }
+    @media (max-width:768px){ .sidebar{ transform:translateX(-280px);} .sidebar.open{ transform:translateX(0);} .main-content{ margin-left:0;} .container{ padding:20px;} }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Sistema Boladão</h2>
+      <p>Gestão de Helpdesk</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fas fa-tachometer-alt"></i>
+        Dashboard
+      </a>
+      <a href="/assets" class="nav-item">
+        <i class="fas fa-desktop"></i>
+        Ativos
+      </a>
+      <a href="/tickets" class="nav-item">
+        <i class="fas fa-ticket-alt"></i>
+        Chamados
+      </a>
+      <a href="/service-orders" class="nav-item">
+        <i class="fas fa-tools"></i>
+        Ordens de Serviço
+      </a>
+      <a href="/inventory" class="nav-item">
+        <i class="fas fa-boxes"></i>
+        Estoque
+      </a>
+      <a href="/integrations" class="nav-item">
+        <i class="fas fa-plug"></i>
+        Integrações
+      </a>
+      <a href="/analytics" class="nav-item">
+        <i class="fas fa-chart-bar"></i>
+        Relatórios
+      </a>
+      <a href="/web/tables" class="nav-item">
+        <i class="fas fa-database"></i>
+        Admin
+      </a>
+      <a href="/admin/helpdesk" class="nav-item active">
+        <i class="fas fa-headset"></i>
+        Admin Helpdesk
+      </a>
+      <a href="/admin/kb" class="nav-item">
+        <i class="fas fa-book"></i>
+        Admin KB
+      </a>
+      <a href="/kb" class="nav-item">
+        <i class="fas fa-book-open"></i>
+        Base de Conhecimento
+      </a>
+    </nav>
+  </div>
+
+  <div class="main-content" id="mainContent">
+    <div class="top-bar">
+      <button class="menu-toggle" id="menuToggle">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div class="user-menu">
+        <span id="userGreeting">Admin Helpdesk</span>
+        <div class="user-avatar" id="userAvatar">A</div>
+        <a href="/web/logout" class="btn btn-primary">
+          <i class="fas fa-sign-out-alt"></i>
+          Sair
+        </a>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <a class="btn btn-secondary" href="/admin/ChamadoCategoria">Categorias</a>
+        <a class="btn btn-secondary" href="/admin/Prioridade">Prioridades</a>
+        <a class="btn btn-secondary" href="/admin/Contato">Agentes</a>
+      </div>
+      <h2>Dados Básicos</h2>
+      <div class="card">
+        <div class="actions">
+          <button class="btn" id="newCatBtn">Nova Categoria</button>
+          <button class="btn" id="newPriBtn">Nova Prioridade</button>
+          <button class="btn" id="newAgentBtn">Novo Agente</button>
+          <button class="btn" id="refreshOptsBtn">Atualizar listas</button>
+        </div>
+      </div>
+
+      <h2>Roteamento</h2>
+      <div id="routingBox" class="card"></div>
+      <div class="actions">
+        <button class="btn" id="addRoutingBtn">Adicionar Regra</button>
+        <button class="btn btn-primary" id="saveRoutingBtn">Salvar Roteamento</button>
+      </div>
+
+      <h2>Macros</h2>
+      <div id="macrosBox" class="card"></div>
+      <div class="actions">
+        <button class="btn" id="addMacroBtn">Adicionar Macro</button>
+        <button class="btn btn-primary" id="saveMacrosBtn">Salvar Macros</button>
+      </div>
+
+      <h2>SLA Overrides</h2>
+      <div id="slaBox" class="card"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="saveSlaBtn">Salvar SLA</button>
+      </div>
+
+      <h2>Fechamento Automático</h2>
+      <div id="autoCloseBox" class="card"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="saveAutoCloseBtn">Salvar Política</button>
+        <button class="btn" id="runAutoCloseBtn">Executar agora</button>
+      </div>
+      <div id="statusBox" class="success"></div>
+    </div>
+  </div>
+  <script>
+  function getAccessToken() {
+    const m = document.cookie.match(/(?:^|; )access_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  async function fetchJSON(url, opts={}) {
+    const token = getAccessToken();
+    const baseHeaders = {'Content-Type':'application/json'};
+    if (token) baseHeaders['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(url, {credentials:'include', headers: baseHeaders, ...opts});
+    if (res.redirected && res.url && res.url.includes('/web/login')) {
+      window.location.href = '/web/login';
+      return Promise.reject(new Error('Not authenticated'));
+    }
+    if (!res.ok) {
+      if (res.status === 401) { window.location.href = '/web/login'; return Promise.reject(new Error('Not authenticated')); }
+      throw new Error('Falha: '+res.status);
+    }
+    return await res.json();
+  }
+  function select(name, options, value) {
+    const s = document.createElement('select');
+    s.className = 'select';
+    s.dataset.name = name;
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = '—';
+    s.appendChild(optNone);
+    options.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = String(o.id);
+      opt.textContent = o.nome;
+      s.appendChild(opt);
+    });
+    s.value = value ? String(value) : '';
+    return s;
+  }
+  function input(name, value, type='text') {
+    const i = document.createElement('input');
+    i.className = 'input';
+    i.dataset.name = name;
+    i.type = type;
+    i.value = value != null ? String(value) : '';
+    return i;
+  }
+  function checkbox(name, checked) {
+    const c = document.createElement('input');
+    c.type = 'checkbox';
+    c.dataset.name = name;
+    c.checked = !!checked;
+    return c;
+  }
+  function textarea(name, value) {
+    const t = document.createElement('textarea');
+    t.className = 'textarea';
+    t.dataset.name = name;
+    t.value = value != null ? String(value) : '';
+    return t;
+  }
+  function row(fields) {
+    const r = document.createElement('div');
+    r.className = 'row';
+    fields.forEach(f => {
+      const fg = document.createElement('div');
+      fg.className = 'form-group';
+      const label = document.createElement('label');
+      label.className = 'label';
+      label.textContent = f.label;
+      fg.appendChild(label);
+      fg.appendChild(f.el);
+      r.appendChild(fg);
+    });
+    return r;
+  }
+  async function loadOptions() {
+    const cats = await fetchJSON('/admin/ChamadoCategoria/items');
+    const pris = await fetchJSON('/admin/Prioridade/items');
+    const agents = await fetchJSON('/admin/Contato/items');
+    window.__opts = {
+      categorias: (cats.items || cats || []).map(x => ({id: x.id, nome: x.nome})),
+      prioridades: (pris.items || pris || []).map(x => ({id: x.id, nome: x.nome})),
+      agentes: (agents.items || agents || []).map(x => ({id: x.id, nome: x.nome})),
+    };
+  }
+  async function loadAll() {
+    await loadOptions();
+    const routing = await fetchJSON('/admin/helpdesk/routing');
+    const macros = await fetchJSON('/admin/helpdesk/macros');
+    const sla = await fetchJSON('/admin/helpdesk/sla-overrides');
+    const autoClose = await fetchJSON('/admin/helpdesk/auto-close');
+    const rb = document.getElementById('routingBox');
+    const mb = document.getElementById('macrosBox');
+    const sb = document.getElementById('slaBox');
+    const ab = document.getElementById('autoCloseBox');
+    rb.innerHTML=''; mb.innerHTML=''; sb.innerHTML=''; ab.innerHTML='';
+    window.__routing = routing.rules || [];
+    window.__macros = macros.macros || [];
+    window.__sla = sla.overrides || [];
+    window.__autoClose = autoClose;
+    renderRouting();
+    renderMacros();
+    renderSLA();
+    renderAutoClose();
+  }
+  function renderRouting() {
+    const box = document.getElementById('routingBox');
+    box.innerHTML='';
+    window.__routing.forEach((r, idx) => {
+      const elCat = select('categoria_id', window.__opts.categorias, r.categoria_id);
+      const elPri = select('prioridade_id', window.__opts.prioridades, r.prioridade_id);
+      const elAgent = select('agente_contato_id', window.__opts.agentes, r.agente_contato_id);
+      const elActive = checkbox('ativo', r.ativo);
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn';
+      removeBtn.textContent = 'Remover';
+      removeBtn.onclick = () => { window.__routing.splice(idx,1); renderRouting(); };
+      const rEl = row([
+        {label:'Categoria', el: elCat},
+        {label:'Prioridade', el: elPri},
+        {label:'Agente', el: elAgent},
+        {label:'Ativo', el: elActive},
+      ]);
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      actions.appendChild(removeBtn);
+      box.appendChild(rEl);
+      box.appendChild(actions);
+      elCat.onchange = () => r.categoria_id = elCat.value ? parseInt(elCat.value) : null;
+      elPri.onchange = () => r.prioridade_id = elPri.value ? parseInt(elPri.value) : null;
+      elAgent.onchange = () => r.agente_contato_id = elAgent.value ? parseInt(elAgent.value) : null;
+      elActive.onchange = () => r.ativo = elActive.checked;
+    });
+  }
+  function renderMacros() {
+    const box = document.getElementById('macrosBox');
+    box.innerHTML='';
+    window.__macros.forEach((m, idx) => {
+      const elNome = input('nome', m.nome);
+      const elDesc = input('descricao', m.descricao);
+      const elActions = textarea('actions', JSON.stringify(m.actions || {}, null, 2));
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn';
+      removeBtn.textContent = 'Remover';
+      removeBtn.onclick = () => { window.__macros.splice(idx,1); renderMacros(); };
+      const rEl = row([
+        {label:'Nome', el: elNome},
+        {label:'Descrição', el: elDesc},
+      ]);
+      const taEl = document.createElement('div');
+      taEl.className = 'form-group';
+      const lab = document.createElement('label');
+      lab.className = 'label';
+      lab.textContent = 'Ações (JSON)';
+      taEl.appendChild(lab);
+      taEl.appendChild(elActions);
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      actions.appendChild(removeBtn);
+      box.appendChild(rEl);
+      box.appendChild(taEl);
+      box.appendChild(actions);
+      elNome.oninput = () => m.nome = elNome.value;
+      elDesc.oninput = () => m.descricao = elDesc.value;
+      elActions.oninput = () => { try { m.actions = JSON.parse(elActions.value || '{}'); } catch(e){} };
+    });
+  }
+  function renderSLA() {
+    const box = document.getElementById('slaBox');
+    box.innerHTML='';
+    const priorities = window.__opts.prioridades;
+    priorities.forEach(p => {
+      let ov = window.__sla.find(o => o.prioridade_id === p.id);
+      if (!ov) { ov = {prioridade_id: p.id, response_hours: 24, resolution_hours: 72, escalation_hours: 48}; window.__sla.push(ov); }
+      const elResp = input('response_hours', ov.response_hours, 'number');
+      const elRes = input('resolution_hours', ov.resolution_hours, 'number');
+      const elEsc = input('escalation_hours', ov.escalation_hours, 'number');
+      const rEl = row([
+        {label:'Prioridade: '+p.nome, el: document.createElement('div')},
+        {label:'Resposta (h)', el: elResp},
+        {label:'Resolução (h)', el: elRes},
+        {label:'Escalonamento (h)', el: elEsc},
+      ]);
+      box.appendChild(rEl);
+      elResp.oninput = () => ov.response_hours = parseInt(elResp.value || '0');
+      elRes.oninput = () => ov.resolution_hours = parseInt(elRes.value || '0');
+      elEsc.oninput = () => ov.escalation_hours = parseInt(elEsc.value || '0');
+    });
+  }
+  function renderAutoClose() {
+    const box = document.getElementById('autoCloseBox');
+    box.innerHTML='';
+    const elEnabled = checkbox('enabled', window.__autoClose.enabled);
+    const elPend = input('pending_customer_days', window.__autoClose.pending_customer_days, 'number');
+    const elRes = input('resolved_days', window.__autoClose.resolved_days, 'number');
+    const rEl = row([
+      {label:'Ativo', el: elEnabled},
+      {label:'Dias em espera', el: elPend},
+      {label:'Dias resolvido', el: elRes},
+    ]);
+    box.appendChild(rEl);
+    elEnabled.onchange = () => window.__autoClose.enabled = elEnabled.checked;
+    elPend.oninput = () => window.__autoClose.pending_customer_days = parseInt(elPend.value || '0');
+    elRes.oninput = () => window.__autoClose.resolved_days = parseInt(elRes.value || '0');
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('saveRoutingBtn').onclick = async () => {
+    await fetchJSON('/admin/helpdesk/routing', {method:'PUT', body:JSON.stringify({rules: window.__routing})});
+    document.getElementById('statusBox').textContent = 'Roteamento salvo';
+  };
+  document.getElementById('refreshOptsBtn').onclick = async () => {
+    try { await loadOptions(); renderRouting(); renderMacros(); renderSLA(); } catch(e){}
+  };
+  document.getElementById('newCatBtn').onclick = () => {
+    window.location.href = '/admin/ChamadoCategoria';
+  };
+  document.getElementById('newPriBtn').onclick = () => {
+    window.location.href = '/admin/Prioridade';
+  };
+  document.getElementById('newAgentBtn').onclick = () => {
+    window.location.href = '/admin/Contato';
+  };
+  document.getElementById('addRoutingBtn').onclick = async () => {
+    if (!window.__opts) { try { await loadOptions(); } catch(e){} }
+    window.__routing.push({categoria_id: null, prioridade_id: null, agente_contato_id: null, ativo: true});
+    renderRouting();
+  };
+  document.getElementById('saveMacrosBtn').onclick = async () => {
+    await fetchJSON('/admin/helpdesk/macros', {method:'PUT', body:JSON.stringify({macros: window.__macros})});
+    document.getElementById('statusBox').textContent = 'Macros salvas';
+  };
+  document.getElementById('addMacroBtn').onclick = () => {
+    window.__macros.push({nome: '', descricao: '', actions: {}});
+    renderMacros();
+  };
+  document.getElementById('saveSlaBtn').onclick = async () => {
+    await fetchJSON('/admin/helpdesk/sla-overrides', {method:'PUT', body:JSON.stringify({overrides: window.__sla})});
+    document.getElementById('statusBox').textContent = 'SLA salvo';
+  };
+  document.getElementById('saveAutoCloseBtn').onclick = async () => {
+    await fetchJSON('/admin/helpdesk/auto-close', {method:'PUT', body:JSON.stringify(window.__autoClose)});
+    document.getElementById('statusBox').textContent = 'Política de fechamento salva';
+  };
+  document.getElementById('runAutoCloseBtn').onclick = async () => {
+    const data = await fetchJSON('/admin/helpdesk/run-auto-close', {method:'POST'});
+    document.getElementById('statusBox').textContent = `Fechados: ${data.closed}`;
+  };
+  (async () => { try { await loadAll(); } catch(e) { window.__opts = {categorias:[], prioridades:[], agentes:[]}; window.__routing = []; window.__macros = []; window.__sla = []; window.__autoClose = {enabled:false,pending_customer_days:14,resolved_days:7}; renderRouting(); renderMacros(); renderSLA(); renderAutoClose(); } })();
+  });
+  // Toggle sidebar like dashboard
+  document.getElementById('menuToggle').addEventListener('click', function() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    sidebar.classList.toggle('collapsed');
+    mainContent.classList.toggle('expanded');
+  });
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('mainContent').classList.add('expanded');
+  }
+  // Load current user greeting and avatar
+  async function loadUser() {
+    try {
+      const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+      const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+      const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
+      const meResp = await fetch('/auth/me', { credentials:'include', headers });
+      if (meResp.ok) {
+        const me = await meResp.json();
+        const nome = me?.nome || me?.user?.nome || me?.email || 'Usuário';
+        document.getElementById('userGreeting').textContent = `Bem-vindo, ${nome}`;
+        const initial = String(nome).trim().charAt(0).toUpperCase() || 'U';
+        document.getElementById('userAvatar').textContent = initial;
+      }
+    } catch {}
+  }
+  document.addEventListener('DOMContentLoaded', loadUser);
+  </script>
+</body>
+</html>

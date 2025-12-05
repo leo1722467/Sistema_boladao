@@ -680,3 +680,68 @@ class TicketCounter(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     empresa_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     next_value: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class HelpdeskRoutingRule(Base, TimestampMixin):
+    __tablename__ = "helpdesk_routing_rule"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False, index=True)
+    categoria_id: Mapped[int | None] = mapped_column(ForeignKey("chamado_categoria.id"), index=True)
+    prioridade_id: Mapped[int | None] = mapped_column(ForeignKey("prioridade.id"), index=True)
+    agente_contato_id: Mapped[int | None] = mapped_column(ForeignKey("contato.id"))
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class HelpdeskMacro(Base, TimestampMixin):
+    __tablename__ = "helpdesk_macro"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False, index=True)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    descricao: Mapped[str | None] = mapped_column(Text)
+    actions: Mapped[dict | None] = mapped_column(JSON)
+
+
+class HelpdeskSLAOverride(Base, TimestampMixin):
+    __tablename__ = "helpdesk_sla_override"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False, index=True)
+    prioridade_id: Mapped[int] = mapped_column(ForeignKey("prioridade.id"), nullable=False, index=True)
+    response_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+    resolution_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=72)
+    escalation_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=48)
+
+
+class HelpdeskAutoClosePolicy(Base, TimestampMixin):
+    __tablename__ = "helpdesk_auto_close_policy"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False, unique=True, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    pending_customer_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
+    resolved_days: Mapped[int] = mapped_column(Integer, nullable=False, default=7)
+
+
+class KBCategory(Base, TimestampMixin):
+    __tablename__ = "kb_category"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    descricao: Mapped[str | None] = mapped_column(Text)
+
+
+class KBArticle(Base, TimestampMixin):
+    __tablename__ = "kb_article"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    empresa_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    categoria_id: Mapped[int | None] = mapped_column(ForeignKey("kb_category.id"), index=True)
+    titulo: Mapped[str] = mapped_column(Text, nullable=False)
+    resumo: Mapped[str | None] = mapped_column(Text)
+    conteudo: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[dict | None] = mapped_column(JSON)
+    publicado: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    visibilidade: Mapped[str] = mapped_column(Text, nullable=False, default="external")

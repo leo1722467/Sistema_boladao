@@ -574,19 +574,18 @@ async def update_ticket(
             if field != "comment":  # Comment is handled separately
                 updates[field] = value
 
-        # Map textual status/priority to IDs for flexibility
+        # Map textual status/priority to IDs for flexibility (supports EN/PT)
         try:
+            svc_map = TicketService()
             if "status" in updates and updates["status"]:
                 status_name = str(updates["status"]).strip().lower()
-                result = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike(f"%{status_name}%")))
-                srow = result.scalars().first()
+                srow = await svc_map._get_default_status(session, status_name)
                 if srow:
                     updates["status_id"] = srow.id
                 del updates["status"]
             if "priority" in updates and updates["priority"]:
                 priority_name = str(updates["priority"]).strip().lower()
-                result = await session.execute(select(Prioridade).where(Prioridade.nome.ilike(f"%{priority_name}%")))
-                prow = result.scalars().first()
+                prow = await svc_map._get_default_priority(session, priority_name)
                 if prow:
                     updates["prioridade_id"] = prow.id
                 del updates["priority"]
@@ -746,21 +745,64 @@ async def _build_ticket_detail_response(
         # If any relation fails to load, continue building with available data
         pass
     
-    # Build basic response
+    # Build basic response with normalized status/priority for UI
+    def _status_code(name: Optional[str]) -> Optional[str]:
+        if not name:
+            return None
+        n = name.strip().lower()
+        mapping = {
+            "novo": "new",
+            "new": "new",
+            "aberto": "open",
+            "open": "open",
+            "em andamento": "in_progress",
+            "em atendimento": "in_progress",
+            "in_progress": "in_progress",
+            "em espera": "pending_customer",
+            "espera": "pending_customer",
+            "aguardando": "pending_customer",
+            "aguardando cliente": "pending_customer",
+            "pending_customer": "pending_customer",
+            "resolvido": "resolved",
+            "resolved": "resolved",
+            "fechado": "closed",
+            "closed": "closed",
+        }
+        return mapping.get(n, n)
+
+    def _priority_code(name: Optional[str]) -> Optional[str]:
+        if not name:
+            return None
+        n = name.strip().lower()
+        mapping = {
+            "baixa": "low",
+            "low": "low",
+            "normal": "normal",
+            "alta": "high",
+            "high": "high",
+            "urgente": "urgent",
+            "urgent": "urgent",
+        }
+        return mapping.get(n, n)
+
+    created = ticket.criado_em or datetime.utcnow()
+    updated = ticket.atualizado_em or ticket.criado_em or datetime.utcnow()
     response_data = {
         "id": ticket.id,
-        "numero": ticket.numero,
-        "titulo": ticket.titulo,
+        "numero": str(ticket.numero or ""),
+        "titulo": str(ticket.titulo or ""),
         "descricao": ticket.descricao,
-        "status": (status_rel.nome.lower() if status_rel and getattr(status_rel, "nome", None) else None),
-        "prioridade": (prioridade_rel.nome.lower() if prioridade_rel and getattr(prioridade_rel, "nome", None) else None),
-        "priority": (prioridade_rel.nome.lower() if prioridade_rel and getattr(prioridade_rel, "nome", None) else None),
+        "status": _status_code(getattr(status_rel, "nome", None) if status_rel else None),
+        "status_id": getattr(ticket, "status_id", None),
+        "prioridade": _priority_code(getattr(prioridade_rel, "nome", None) if prioridade_rel else None),
+        "prioridade_id": getattr(ticket, "prioridade_id", None),
+        "priority": _priority_code(getattr(prioridade_rel, "nome", None) if prioridade_rel else None),
         "categoria": (categoria_rel.nome if categoria_rel and getattr(categoria_rel, "nome", None) else None),
         "ativo_id": ticket.ativo_id,
         "requisitante": ({"id": requisitante_rel.id, "nome": requisitante_rel.nome} if requisitante_rel else None),
         "agente": ({"id": agente_rel.id, "nome": agente_rel.nome} if agente_rel else None),
-        "criado_em": ticket.criado_em.isoformat() if ticket.criado_em else None,
-        "atualizado_em": ticket.atualizado_em.isoformat() if ticket.atualizado_em else None,
+        "criado_em": created.isoformat(),
+        "atualizado_em": updated.isoformat(),
         "fechado_em": ticket.fechado_em.isoformat() if ticket.fechado_em else None,
     }
     # Add comments history
@@ -1299,3 +1341,93 @@ async def delete_defeito(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Defeito não encontrado")
     await session.commit()
     return {"message": "Defeito removido"}
+@router.post(
+    "/tickets/{ticket_id}/apply-macro",
+    response_model=TicketDetailResponse,
+    responses={
+        200: {"description": "Macro aplicada com sucesso"},
+        403: {"model": ErrorResponse, "description": "Permissões insuficientes"},
+        404: {"model": ErrorResponse, "description": "Ticket ou Macro não encontrado"},
+        500: {"model": ErrorResponse, "description": "Erro interno"}
+    },
+    summary="Aplicar macro no ticket",
+    description="Aplica uma macro configurada no ticket e retorna o ticket atualizado."
+)
+async def apply_macro_endpoint(
+    ticket_id: int,
+    macro_id: int,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> TicketDetailResponse:
+    try:
+        if not auth_context.has_permission(Permission.MANAGE_TICKETS):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to apply macros")
+        tsvc = TicketService()
+        updated = await tsvc.apply_macro(
+            session=session,
+            empresa_id=auth_context.tenant.empresa_id,
+            ticket_id=ticket_id,
+            macro_id=macro_id,
+            user_id=auth_context.user.contato_id,
+            user_role=auth_context.role,
+        )
+        await session.commit()
+        try:
+            await session.refresh(updated, ['comentarios'])
+        except Exception:
+            pass
+        detail = await _build_ticket_detail_response(session, updated, auth_context.role, include_sla=True, include_actions=True)
+        return detail
+    except BusinessLogicError as e:
+        raise business_exception_to_http(e)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred while applying macro")
+@router.get("/kb/articles")
+async def kb_list(session: AsyncSession = Depends(get_db), auth: AuthorizationContext = Depends(get_authorization_context), q: Optional[str] = None, limit: int = 20):
+    from app.db.models import KBArticle
+    empresa_id = auth.tenant.empresa_id
+    qstmt = select(KBArticle).where(KBArticle.empresa_id == empresa_id)
+    if auth.role == "requester":
+        from sqlalchemy import and_
+        qstmt = qstmt.where(and_(KBArticle.publicado == True, KBArticle.visibilidade == "external"))
+    if q:
+        like = f"%{q}%"
+        qstmt = qstmt.where((KBArticle.titulo.ilike(like)) | (KBArticle.conteudo.ilike(like)) | (KBArticle.resumo.ilike(like)))
+    qstmt = qstmt.limit(limit)
+    res = await session.execute(qstmt)
+    items = res.scalars().all()
+    return [{"id": a.id, "titulo": a.titulo, "resumo": a.resumo, "categoria_id": a.categoria_id, "visibilidade": a.visibilidade} for a in items]
+
+@router.get("/kb/articles/{article_id}")
+async def kb_get(article_id: int, session: AsyncSession = Depends(get_db), auth: AuthorizationContext = Depends(get_authorization_context)):
+    from app.db.models import KBArticle
+    a = await session.get(KBArticle, article_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if auth.role == "requester" and (not a.publicado or a.visibilidade != "external"):
+        raise HTTPException(status_code=404, detail="Article not found")
+    return {"id": a.id, "titulo": a.titulo, "resumo": a.resumo, "conteudo": a.conteudo, "tags": a.tags, "categoria_id": a.categoria_id}
+
+@router.post("/kb/suggest")
+async def kb_suggest(payload: Dict[str, Any], session: AsyncSession = Depends(get_db), auth: AuthorizationContext = Depends(get_authorization_context)):
+    from app.db.models import KBArticle
+    empresa_id = auth.tenant.empresa_id
+    text = (str(payload.get("titulo") or "") + " " + str(payload.get("descricao") or "")).strip().lower()
+    res = await session.execute(select(KBArticle).where(KBArticle.empresa_id == empresa_id))
+    items = res.scalars().all()
+    def score(a):
+        s = 0
+        t = (a.titulo or "") + " " + (a.resumo or "") + " " + (a.conteudo or "")
+        t = t.lower()
+        for w in set(text.split()):
+            if len(w) < 3: continue
+            if w in t:
+                s += 1
+        return s
+    ranked = sorted(items, key=score, reverse=True)
+    if auth.role == "requester":
+        ranked = [a for a in ranked if a.publicado and a.visibilidade == "external"]
+    top = ranked[:5]
+    return [{"id": a.id, "titulo": a.titulo, "resumo": a.resumo} for a in top]

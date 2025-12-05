@@ -87,21 +87,13 @@
       <div class="form-group">
         <label class="label">Status</label>
         <select id="statusSelect" class="select">
-          <option value="new">Novo</option>
-          <option value="open">Aberto</option>
-          <option value="in_progress">Em Andamento</option>
-          <option value="pending_customer">Aguardando Cliente</option>
-          <option value="resolved">Resolvido</option>
-          <option value="closed">Fechado</option>
+          <option value="">Selecione...</option>
         </select>
       </div>
       <div class="form-group">
         <label class="label">Prioridade</label>
         <select id="prioritySelect" class="select">
-          <option value="low">Baixa</option>
-          <option value="normal">Normal</option>
-          <option value="high">Alta</option>
-          <option value="urgent">Urgente</option>
+          <option value="">Selecione...</option>
         </select>
       </div>
       <div class="form-group">
@@ -207,11 +199,20 @@
         } else {
           t = await r.json();
         }
+        // Derive empresa from ticket number pattern E{empresa}{ORIGIN}-{N} to grant admin edit when empresa=1
+        try {
+          if (!isAdminEditor && t && typeof t.numero === 'string') {
+            const m = /^E(\d+)[A-Z]+-\d+$/i.exec(t.numero.trim());
+            if (m && parseInt(m[1], 10) === 1) {
+              isAdminEditor = true;
+            }
+          }
+        } catch {}
         document.getElementById('ticketNumber').textContent = t.numero || `#${ticketId}`;
         document.getElementById('tituloInput').value = t.titulo || '';
         document.getElementById('descricaoInput').value = t.descricao || '';
-        document.getElementById('statusSelect').value = t.status || 'new';
-        document.getElementById('prioritySelect').value = t.priority || 'normal';
+        await loadStatusOptions(t.status_id || null);
+        await loadPriorityOptions(t.prioridade_id || null);
         await loadAgentOptions((t.agente && t.agente.id) ? t.agente.id : null);
         await loadUserGreeting();
 
@@ -223,6 +224,13 @@
           document.getElementById('prioritySelect').setAttribute('disabled', 'disabled');
           document.getElementById('agenteSelect').setAttribute('disabled', 'disabled');
           showError('Você só pode adicionar comentários aos seus chamados.');
+        } else {
+          document.getElementById('errorBox').style.display = 'none';
+          document.getElementById('tituloInput').removeAttribute('disabled');
+          document.getElementById('descricaoInput').removeAttribute('disabled');
+          document.getElementById('statusSelect').removeAttribute('disabled');
+          document.getElementById('prioritySelect').removeAttribute('disabled');
+          document.getElementById('agenteSelect').removeAttribute('disabled');
         }
       } catch (e) {
         showError('Erro ao carregar chamado');
@@ -243,21 +251,47 @@
       } catch (e) { /* silent */ }
     }
 
+    async function loadStatusOptions(selectedId) {
+      try {
+        const headers = await apiHeaders();
+        const r = await fetch('/admin/Chamado/foreign-key-options/status_id', { credentials: 'include', headers });
+        if (!r.ok) return;
+        const options = await r.json();
+        const select = document.getElementById('statusSelect');
+        select.innerHTML = '<option value="">Selecione...</option>' +
+          options.map(o => `<option value="${o.id}">${o.display}</option>`).join('');
+        if (selectedId) select.value = String(selectedId);
+      } catch (e) { /* silent */ }
+    }
+
+    async function loadPriorityOptions(selectedId) {
+      try {
+        const headers = await apiHeaders();
+        const r = await fetch('/admin/Chamado/foreign-key-options/prioridade_id', { credentials: 'include', headers });
+        if (!r.ok) return;
+        const options = await r.json();
+        const select = document.getElementById('prioritySelect');
+        select.innerHTML = '<option value="">Selecione...</option>' +
+          options.map(o => `<option value="${o.id}">${o.display}</option>`).join('');
+        if (selectedId) select.value = String(selectedId);
+      } catch (e) { /* silent */ }
+    }
+
     async function saveTicket() {
       hideError();
       try {
         const payload = {};
         const titulo = document.getElementById('tituloInput').value.trim();
         const descricao = document.getElementById('descricaoInput').value.trim();
-        const status = document.getElementById('statusSelect').value;
-        const priority = document.getElementById('prioritySelect').value;
+        const statusId = document.getElementById('statusSelect').value;
+        const prioridadeId = document.getElementById('prioritySelect').value;
         const agenteId = document.getElementById('agenteSelect').value;
         const comment = document.getElementById('commentInput').value;
         if (isAdminEditor) {
           if (titulo) payload.titulo = titulo;
           if (descricao) payload.descricao = descricao;
-          if (status) payload.status = status;
-          if (priority) payload.priority = priority;
+          if (statusId) payload.status_id = parseInt(statusId, 10);
+          if (prioridadeId) payload.prioridade_id = parseInt(prioridadeId, 10);
           if (agenteId) payload.agente_contato_id = parseInt(agenteId, 10);
           if (comment) payload.comment = comment;
         } else {

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin KB</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f8f9fa; color:#333; line-height:1.6; }
+    .sidebar { position:fixed; left:0; top:0; width:280px; height:100vh; background:linear-gradient(135deg,#2c3e50 0%,#34495e 100%); color:white; z-index:1000; transition:transform .3s ease; overflow-y:auto; }
+    .sidebar.collapsed { transform:translateX(-280px); }
+    .sidebar-header { padding:20px; border-bottom:1px solid rgba(255,255,255,0.1); }
+    .sidebar-header h2 { font-size:24px; font-weight:600; margin-bottom:5px; }
+    .sidebar-header p { font-size:14px; opacity:.8; }
+    .sidebar-nav { padding:20px 0; }
+    .nav-item { display:block; padding:12px 20px; color:white; text-decoration:none; transition:all .3s ease; border-left:3px solid transparent; }
+    .nav-item:hover, .nav-item.active { background:rgba(255,255,255,0.1); border-left-color:#3498db; }
+    .nav-item i { width:20px; margin-right:10px; }
+    .main-content { margin-left:280px; min-height:100vh; transition:margin-left .3s ease; }
+    .main-content.expanded { margin-left:0; }
+    .top-bar { background:white; padding:15px 30px; box-shadow:0 2px 10px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center; }
+    .menu-toggle { background:none; border:none; font-size:20px; cursor:pointer; color:#666; }
+    .user-menu { display:flex; align-items:center; gap:15px; }
+    .user-avatar { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#3498db,#2980b9); display:flex; align-items:center; justify-content:center; color:white; font-weight:600; }
+    .container { padding:30px; max-width:1400px; }
+    .card { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e9ecef; margin-bottom:20px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+    .form-group { flex:1; min-width:220px; }
+    .label { display:block; font-size:13px; color:#666; margin-bottom:6px; }
+    .input, .select, .textarea { width:100%; padding:10px; border:1px solid #e9ecef; border-radius:8px; font-size:14px; }
+    .textarea { min-height:100px; }
+    .actions { display:flex; gap:10px; margin-top:10px; }
+    .btn { display:inline-flex; align-items:center; padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:500; text-decoration:none; cursor:pointer; transition:all .3s ease; }
+    .btn-primary { background:linear-gradient(135deg,#3498db,#2980b9); color:white; }
+    .btn-primary:hover { background:linear-gradient(135deg,#2980b9,#21618c); transform:translateY(-1px); }
+    .btn i { margin-right:8px; }
+    .success { color:#27ae60; margin-top:10px; }
+    @media (max-width:768px){ .sidebar{ transform:translateX(-280px);} .sidebar.open{ transform:translateX(0);} .main-content{ margin-left:0;} .container{ padding:20px;} }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Sistema Boladão</h2>
+      <p>Admin KB</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+      <a href="/admin/helpdesk" class="nav-item"><i class="fas fa-headset"></i> Admin Helpdesk</a>
+      <a href="/admin/kb" class="nav-item active"><i class="fas fa-book"></i> Admin KB</a>
+      <a href="/web/tables" class="nav-item"><i class="fas fa-database"></i> Admin</a>
+    </nav>
+  </div>
+  <div class="main-content" id="mainContent">
+    <div class="top-bar">
+      <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+      <div class="user-menu">
+        <span id="userGreeting">Admin KB</span>
+        <div class="user-avatar" id="userAvatar">K</div>
+      </div>
+    </div>
+    <div class="container">
+      <h2>Gestão de Artigos</h2>
+      <div class="card">
+        <div class="row">
+          <input id="searchInput" class="input" placeholder="Buscar artigos por título/descrição" />
+          <button class="btn btn-primary" id="reloadBtn"><i class="fas fa-rotate"></i> Recarregar</button>
+          <a class="btn" href="/admin/KBArticle/create"><i class="fas fa-plus"></i> Novo Artigo</a>
+          <a class="btn" href="/admin/KBArticle"><i class="fas fa-pen"></i> Gerenciar Artigos</a>
+          <a class="btn" href="/admin/KBCategory"><i class="fas fa-folder"></i> Categorias</a>
+        </div>
+      </div>
+      <div id="articlesBox" class="card"></div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('menuToggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+      document.getElementById('mainContent').classList.toggle('expanded');
+    });
+    if (window.innerWidth <= 768) {
+      document.getElementById('sidebar').classList.add('collapsed');
+      document.getElementById('mainContent').classList.add('expanded');
+    }
+    async function loadUser() {
+      try {
+        const tokenCookie = document.cookie.split('; ').find(r => r.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
+        const meResp = await fetch('/auth/me', { credentials:'include', headers });
+        if (meResp.ok) {
+          const me = await meResp.json();
+          const nome = me?.nome || me?.user?.nome || me?.email || 'Usuário';
+          document.getElementById('userGreeting').textContent = `Bem-vindo, ${nome}`;
+          const initial = String(nome).trim().charAt(0).toUpperCase() || 'U';
+          document.getElementById('userAvatar').textContent = initial;
+        }
+      } catch {}
+    }
+    document.addEventListener('DOMContentLoaded', loadUser);
+    function getToken() {
+      const m = document.cookie.match(/(?:^|; )access_token=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }
+    async function fetchJSON(url, opts={}) {
+      const token = getToken();
+      const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
+      const res = await fetch(url, { credentials:'include', headers, ...opts });
+      if (res.redirected && res.url && res.url.includes('/web/login')) {
+        window.location.href = '/web/login';
+        throw new Error('Not authenticated');
+      }
+      if (!res.ok) {
+        if (res.status === 401) { window.location.href = '/web/login'; throw new Error('Not authenticated'); }
+        throw new Error('Falha: '+res.status);
+      }
+      return await res.json();
+    }
+    async function loadArticles() {
+      const items = await fetchJSON('/admin/KBArticle/items');
+      window.__kb = items;
+      renderArticles();
+    }
+    function renderArticles() {
+      const q = (document.getElementById('searchInput').value || '').toLowerCase();
+      const items = (window.__kb || []).filter(a => {
+        const t = (a.titulo || '').toLowerCase();
+        const r = (a.resumo || '').toLowerCase();
+        return !q || t.includes(q) || r.includes(q);
+      });
+      const box = document.getElementById('articlesBox');
+      if (!items.length) { box.innerHTML = '<div class="empty-state">Nenhum artigo</div>'; return; }
+      box.innerHTML = items.map(a => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #e9ecef;">
+          <div style="flex:1;">
+            <div style="font-weight:600;color:#2c3e50;">${a.titulo}</div>
+            <div style="color:#666;">${a.resumo || ''}</div>
+            <div style="color:#666;font-size:12px;">Visibilidade: ${a.visibilidade || 'external'} · Publicado: ${a.publicado ? 'Sim' : 'Não'}</div>
+          </div>
+          <a class="btn" href="/admin/KBArticle/${a.id}"><i class="fas fa-edit"></i> Editar</a>
+          <button class="btn" onclick="togglePublish(${a.id}, ${a.publicado ? 'false' : 'true'})">${a.publicado ? 'Despublicar' : 'Publicar'}</button>
+          <button class="btn" onclick="setVisibility(${a.id}, '${(a.visibilidade||'external')==='external'?'internal':'external'}')">Tornar ${(a.visibilidade||'external')==='external'?'Interno':'Externo'}</button>
+        </div>
+      `).join('');
+    }
+    async function togglePublish(id, value) {
+      await fetchJSON(`/admin/KBArticle/items/${id}`, { method:'PUT', body: JSON.stringify({ publicado: !!value }) });
+      await loadArticles();
+    }
+    async function setVisibility(id, value) {
+      await fetchJSON(`/admin/KBArticle/items/${id}`, { method:'PUT', body: JSON.stringify({ visibilidade: value }) });
+      await loadArticles();
+    }
+    document.getElementById('reloadBtn').onclick = loadArticles;
+    document.getElementById('searchInput').addEventListener('input', renderArticles);
+    loadArticles();
+  </script>
+</body>
+</html>

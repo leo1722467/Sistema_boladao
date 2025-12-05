@@ -17,6 +17,7 @@ from app.api.ops import router as ops_router
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
 from app.api.helpdesk import router as helpdesk_router
+from app.api.helpdesk_admin import router as helpdesk_admin_router
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.services.ticket import TicketService
@@ -123,8 +124,8 @@ def create_app() -> FastAPI:
     # Auth middleware
     app.add_middleware(
         AuthenticationMiddleware,
-        protected_paths=["/admin", "/dashboard"],
-        api_prefixes=["/api", "/admin/api"],
+        protected_paths=["/admin", "/dashboard", "/kb"],
+        api_prefixes=["/api", "/admin/api", "/admin/helpdesk"],
     )
 
     # CORS
@@ -141,6 +142,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(helpdesk_router)
+    app.include_router(helpdesk_admin_router)
     app.include_router(web_router)
     app.include_router(admin_web_router)
     app.include_router(ops_router)

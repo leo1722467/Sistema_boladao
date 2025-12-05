@@ -39,7 +39,7 @@ class AuthManager {
      */
     requiresAuthentication() {
         const path = window.location.pathname;
-        const protectedPaths = ['/admin', '/dashboard'];
+        const protectedPaths = ['/admin', '/dashboard', '/kb'];
         return protectedPaths.some(protectedPath => path.startsWith(protectedPath));
     }
 
@@ -67,6 +67,9 @@ class AuthManager {
             });
 
             this.isCheckingAuth = false;
+            if (response.redirected && response.url && response.url.includes('/web/login')) {
+                return false;
+            }
             return response.ok;
         } catch (error) {
             console.error('Authentication check failed:', error);
@@ -99,7 +102,7 @@ class AuthManager {
         document.cookie = 'access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         
         // Redirect to login
-        window.location.href = '/';
+        window.location.href = '/web/login';
     }
 
     /**
@@ -192,3 +195,23 @@ window.addEventListener('beforeunload', () => {
 
 // Export for global access
 window.authManager = authManager;
+
+// Global fetch wrapper to redirect to login when unauthenticated
+(function() {
+    const _fetch = window.fetch;
+    window.fetch = async function(input, init) {
+        try {
+            const res = await _fetch(input, init);
+            if (res && (res.status === 401 || (res.redirected && res.url && res.url.includes('/web/login')))) {
+                authManager.redirectToLogin();
+            }
+            return res;
+        } catch (err) {
+            // Network or aborted: if page requires auth, redirect
+            try {
+                if (authManager.requiresAuthentication()) authManager.redirectToLogin();
+            } catch {}
+            throw err;
+        }
+    };
+})();
