@@ -1,59 +1,38 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Artigo - Base de Conhecimento</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <h2>Sistema Boladão</h2>
-      <p>Base de Conhecimento</p>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="/kb" class="nav-item"><i class="fas fa-book"></i> Base de Conhecimento</a>
-      <a href="/tickets" class="nav-item"><i class="fas fa-ticket-alt"></i> Chamados</a>
-    </nav>
-  </div>
-  <div class="main-content" id="mainContent">
-    <div class="top-bar">
-      <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
-      <div class="user-menu">
-        <span id="userGreeting">Artigo</span>
-        <div class="user-avatar" id="userAvatar">K</div>
-      </div>
-    </div>
-    <div class="container">
-      <div id="articleBox" class="card"></div>
-    </div>
-  </div>
-  <script>
-    document.getElementById('menuToggle').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('collapsed');
-      document.getElementById('mainContent').classList.toggle('expanded');
-    });
-    const articleId = window.__ARTICLE_ID__ || {{ article_id }};
-    async function fetchJSON(url) {
-      const tokenCookie = document.cookie.split('; ').find(r => r.startsWith('access_token='));
-      const token = tokenCookie ? tokenCookie.split('=')[1] : null;
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const res = await fetch(url, { credentials:'include', headers });
-      if (!res.ok) throw new Error('Falha: '+res.status);
-      return await res.json();
-    }
-    async function loadArticle() {
-      const a = await fetchJSON(`/api/helpdesk/kb/articles/${articleId}`);
-      const box = document.getElementById('articleBox');
-      box.innerHTML = `
-        <h2 style="margin-bottom:10px;">${a.titulo}</h2>
-        ${a.resumo ? `<p style="color:#666;">${a.resumo}</p>` : ''}
-        <div style="margin-top:15px;white-space:pre-wrap;">${a.conteudo}</div>
-      `;
-    }
-    loadArticle();
-  </script>
-</body>
-</html>
+{% extends 'base.html' %}
+{% set sidebar_subtitle = 'Base de Conhecimento' %}
+{% block title %}Artigo - Base de Conhecimento{% endblock %}
+{% block extra_head %}
+<style>
+  .container { padding:30px; max-width:900px; }
+  .card { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e9ecef; }
+</style>
+{% endblock %}
+{% block topbar_left %}
+<h1 class="page-title">Artigo</h1>
+{% endblock %}
+{% block content %}
+  <div id="articleBox" class="card"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const articleId = {{ article_id }};
+  async function fetchJSON(url) {
+    const tokenCookie = document.cookie.split('; ').find(r => r.startsWith('access_token='));
+    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const res = await fetch(url, { credentials:'include', headers });
+    if (!res.ok) throw new Error('Falha: '+res.status);
+    return await res.json();
+  }
+  async function loadArticle() {
+    const a = await fetchJSON(`/api/helpdesk/kb/articles/${articleId}`);
+    const box = document.getElementById('articleBox');
+    box.innerHTML = `
+      <h2 style="margin-bottom:10px;">${a.titulo}</h2>
+      ${a.resumo ? `<p style=\"color:#666;\">${a.resumo}</p>` : ''}
+      <div style="margin-top:15px;white-space:pre-wrap;">${a.conteudo}</div>
+    `;
+  }
+  loadArticle();
+</script>
+{% endblock %}

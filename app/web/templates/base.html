@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Sistema Boladão{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Sistema Boladão</h2>
+      <p>{% if sidebar_subtitle %}{{ sidebar_subtitle }}{% else %}Gestão de Helpdesk{% endif %}</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-item {% if request.url.path.startswith('/dashboard') %}active{% endif %}">
+        <i class="fas fa-tachometer-alt"></i>
+        Dashboard
+      </a>
+      <a href="/assets" class="nav-item {% if request.url.path.startswith('/assets') %}active{% endif %}">
+        <i class="fas fa-desktop"></i>
+        Ativos
+      </a>
+      <a href="/tickets" class="nav-item {% if request.url.path.startswith('/tickets') %}active{% endif %}">
+        <i class="fas fa-ticket-alt"></i>
+        Chamados
+      </a>
+      <a href="/service-orders" class="nav-item {% if request.url.path.startswith('/service-orders') %}active{% endif %}">
+        <i class="fas fa-tools"></i>
+        Ordens de Serviço
+      </a>
+      <a href="/inventory" class="nav-item {% if request.url.path.startswith('/inventory') %}active{% endif %}">
+        <i class="fas fa-boxes"></i>
+        Estoque
+      </a>
+      <a href="/integrations" class="nav-item {% if request.url.path.startswith('/integrations') %}active{% endif %}">
+        <i class="fas fa-plug"></i>
+        Integrações
+      </a>
+      <a href="/kb" class="nav-item {% if request.url.path.startswith('/kb') %}active{% endif %}">
+        <i class="fas fa-book"></i>
+        Base de Conhecimento
+      </a>
+      <a href="/analytics" class="nav-item {% if request.url.path.startswith('/analytics') %}active{% endif %}">
+        <i class="fas fa-chart-bar"></i>
+        Relatórios
+      </a>
+      <a href="/web/tables" class="nav-item {% if request.url.path.startswith('/web/tables') %}active{% endif %}">
+        <i class="fas fa-database"></i>
+        Admin
+      </a>
+      <a href="/admin/helpdesk" class="nav-item {% if request.url.path.startswith('/admin/helpdesk') %}active{% endif %}">
+        <i class="fas fa-headset"></i>
+        Admin Helpdesk
+      </a>
+      <a href="/admin/kb" class="nav-item {% if request.url.path.startswith('/admin/kb') %}active{% endif %}">
+        <i class="fas fa-book"></i>
+        Admin KB
+      </a>
+    </nav>
+  </div>
+
+  <div class="main-content" id="mainContent">
+    <div class="top-bar">
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <button class="menu-toggle" id="menuToggle">
+          <i class="fas fa-bars"></i>
+        </button>
+        {% block topbar_left %}{% endblock %}
+      </div>
+      <div class="user-menu">
+        <span id="userGreeting">Bem-vindo, Usuário</span>
+        <div class="user-avatar" id="userAvatar">U</div>
+        <a href="/web/logout" class="btn btn-primary">
+          <i class="fas fa-sign-out-alt"></i>
+          Sair
+        </a>
+      </div>
+    </div>
+
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const toggle = document.getElementById('menuToggle');
+      if (toggle) {
+        toggle.addEventListener('click', function() {
+          const sidebar = document.getElementById('sidebar');
+          const mainContent = document.getElementById('mainContent');
+          if (sidebar && mainContent) {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+          }
+        });
+      }
+      if (window.innerWidth <= 768) {
+        const s = document.getElementById('sidebar');
+        const m = document.getElementById('mainContent');
+        if (s) s.classList.add('collapsed');
+        if (m) m.classList.add('expanded');
+      }
+      try {
+        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+        const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+        const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+        fetch('/auth/me', { credentials: 'include', headers }).then(r => {
+          if (!r.ok) return;
+          return r.json();
+        }).then(me => {
+          if (!me) return;
+          const nome = me?.nome || me?.user?.nome || me?.email || 'Usuário';
+          const g = document.getElementById('userGreeting');
+          const a = document.getElementById('userAvatar');
+          if (g) g.textContent = `Bem-vindo, ${nome}`;
+          const initial = String(nome).trim().charAt(0).toUpperCase() || 'U';
+          if (a) a.textContent = initial;
+        }).catch(() => {});
+      } catch {}
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

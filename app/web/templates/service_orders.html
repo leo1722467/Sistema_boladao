@@ -1,320 +1,86 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ordens de Serviço</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; }
-    .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100vh; background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 1000; transition: transform 0.3s ease; overflow-y: auto; }
-    .sidebar.collapsed { transform: translateX(-280px); }
-    .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    .sidebar-header h2 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
-    .sidebar-header p { font-size: 14px; opacity: 0.8; }
-    .sidebar-nav { padding: 20px 0; }
-    .nav-item { display: block; padding: 12px 20px; color: white; text-decoration: none; transition: all 0.3s ease; border-left: 3px solid transparent; }
-    .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); border-left-color: #3498db; }
-    .nav-item i { width: 20px; margin-right: 10px; }
-    .main-content { margin-left: 280px; min-height: 100vh; transition: margin-left 0.3s ease; }
-    .main-content.expanded { margin-left: 0; }
-    .top-bar { background: white; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-    .menu-toggle { background: none; border: none; font-size: 20px; cursor: pointer; color: #666; }
-    .page-title { font-size: 24px; font-weight: 600; color: #2c3e50; }
-    .container { padding: 30px; max-width: 1400px; }
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-left: 4px solid #3498db; transition: transform 0.3s ease; }
-    .stat-card:hover { transform: translateY(-2px); }
-    .stat-title { font-size: 14px; color: #666; font-weight: 500; }
-    .stat-value { font-size: 24px; font-weight: 700; color: #2c3e50; }
-    .filters-section { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; }
-    .filters-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .filters-title { font-size: 18px; font-weight: 600; color: #2c3e50; }
-    .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
-    .filter-group { display: flex; flex-direction: column; }
-    .filter-label { font-size: 14px; font-weight: 500; color: #555; margin-bottom: 8px; }
-    .filter-input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; transition: border-color 0.3s ease; }
-    .filter-input:focus { outline: none; border-color: #3498db; box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1); }
-    .filter-actions { display: flex; gap: 10px; align-items: center; }
-    .btn { display: inline-flex; align-items: center; padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; transition: all 0.3s ease; }
-    .btn-primary { background: linear-gradient(135deg, #3498db, #2980b9); color: white; }
-    .btn-primary:hover { background: linear-gradient(135deg, #2980b9, #21618c); transform: translateY(-1px); }
-    .tickets-section { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden; }
-    .tickets-header { padding: 20px 25px; border-bottom: 1px solid #e9ecef; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; }
-    .tickets-title { font-size: 18px; font-weight: 600; color: #2c3e50; }
-    .tickets-count { font-size: 14px; color: #666; background: #e9ecef; padding: 4px 12px; border-radius: 20px; }
-    .tickets-table { width: 100%; border-collapse: collapse; }
-    .tickets-table th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; color: #2c3e50; border-bottom: 1px solid #e9ecef; }
-    .tickets-table td { padding: 15px; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
-    .tickets-table tr:hover { background: #f8f9fa; }
-    .pagination { padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e9ecef; }
-    .pagination-info { color: #666; font-size: 14px; }
-    .pagination-controls { display: flex; gap: 8px; }
-    .page-btn { width: 36px; height: 36px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.3s ease; }
-    .page-btn:hover, .page-btn.active { background: #3498db; color: white; border-color: #3498db; }
-    .loading { text-align: center; padding: 40px; color: #666; }
-    .empty-state { text-align: center; padding: 60px 20px; color: #666; }
-    .empty-state i { font-size: 48px; margin-bottom: 20px; opacity: 0.5; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <aside id="sidebar" class="sidebar">
-      <div class="sidebar-header">
-        <h2>Sistema Boladão</h2>
-        <p>Helpdesk & OS</p>
-      </div>
-      <div class="sidebar-nav">
-        <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
-        <a href="/assets" class="nav-item"><i class="fas fa-desktop"></i> Ativos</a>
-        <a href="/tickets" class="nav-item"><i class="fas fa-ticket-alt"></i> Chamados</a>
-        <a href="/service-orders" class="nav-item active"><i class="fas fa-tools"></i> Ordens de Serviço</a>
-        <a href="/inventory" class="nav-item"><i class="fas fa-boxes"></i> Estoque</a>
-        <a href="/integrations" class="nav-item"><i class="fas fa-plug"></i> Integrações</a>
-        <a href="/analytics" class="nav-item"><i class="fas fa-chart-bar"></i> Relatórios</a>
-        <a href="/web/tables" class="nav-item"><i class="fas fa-database"></i> Admin</a>
-      </div>
-    </aside>
-
-    <div id="mainContent" class="main-content">
-      <div class="top-bar" style="position: relative; justify-content: center;">
-        <button id="menuToggle" class="menu-toggle" style="position:absolute; left:24px;"><i class="fas fa-bars"></i></button>
-        <div class="page-title" style="font-weight:800; text-align:center;">Ordens de Serviço</div>
-      </div>
-      <div class="container">
-        <section class="stats-row">
-          <div class="card">
-            <div class="card-header">
-              <h2>Resumo</h2>
-            </div>
-            <div class="stats-row">
-              <div class="stat-card"><div class="stat-title">Total OS</div><div id="osTotalCount" class="stat-value">0</div></div>
-              <div class="stat-card"><div class="stat-title">Em Andamento</div><div id="osInProgressCount" class="stat-value">0</div></div>
-              <div class="stat-card"><div class="stat-title">Concluídas</div><div id="osCompletedCount" class="stat-value">0</div></div>
-              <div class="stat-card"><div class="stat-title">Pendentes</div><div id="osPendingCount" class="stat-value">0</div></div>
-            </div>
-          </div>
-        </section>
-        <section class="filters-section">
-          <div class="filters-header">
-            <div class="filters-title">Filtros</div>
-          </div>
-          <div class="filters-grid">
-            <div class="filter-group">
-              <label class="filter-label">Busca</label>
-              <input id="searchInput" class="filter-input" placeholder="Buscar (nº OS, atividade, observação)" />
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Número APR</label>
-              <input id="aprInput" class="filter-input" placeholder="Número APR" />
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">ID do Chamado</label>
-              <input id="ticketInput" class="filter-input" placeholder="ID do Chamado" />
-            </div>
-          </div>
-          <div class="filter-actions">
-            <button id="applyFiltersBtn" class="btn btn-primary"><i class="fas fa-filter"></i> Aplicar Filtros</button>
-            <button id="clearFiltersBtn" class="btn"><i class="fas fa-times"></i> Limpar</button>
-          </div>
-        </section>
-
-        <section class="tickets-section">
-          <div class="tickets-header">
-            <div class="tickets-title">Lista de Ordens de Serviço</div>
-            <div id="soCount" class="tickets-count">0 ordens</div>
-          </div>
-          <div id="serviceOrdersTableContainer" class="table-container"></div>
-        </section>
-      </div>
+{% extends 'base.html' %}
+{% set sidebar_subtitle = 'Helpdesk & OS' %}
+{% block title %}Ordens de Serviço - Sistema Boladão{% endblock %}
+{% block extra_head %}
+<style>
+  .container { padding: 30px; max-width: 1400px; }
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+  .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-left: 4px solid #3498db; }
+  .stat-title { font-size: 14px; color: #666; font-weight: 500; }
+  .stat-value { font-size: 24px; font-weight: 700; color: #2c3e50; }
+  .filters-section { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; }
+  .filters-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .filters-title { font-size: 18px; font-weight: 600; color: #2c3e50; }
+  .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+  .filter-group { display: flex; flex-direction: column; }
+  .filter-label { font-size: 14px; font-weight: 500; color: #555; margin-bottom: 8px; }
+  .filter-input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+  .filter-actions { display: flex; gap: 10px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
+  .btn-primary { background: linear-gradient(135deg, #3498db, #2980b9); color: white; }
+  .tickets-section { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden; }
+  .tickets-header { padding: 20px 25px; border-bottom: 1px solid #e9ecef; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; }
+  .tickets-title { font-size: 18px; font-weight: 600; color: #2c3e50; }
+  .tickets-count { font-size: 14px; color: #666; background: #e9ecef; padding: 4px 12px; border-radius: 20px; }
+  .tickets-table { width: 100%; border-collapse: collapse; }
+  .tickets-table th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; color: #2c3e50; border-bottom: 1px solid #e9ecef; }
+  .tickets-table td { padding: 15px; border-bottom: 1px solid #f1f3f4; }
+  .loading { text-align: center; padding: 40px; color: #666; }
+  .empty-state { text-align: center; padding: 60px 20px; color: #666; }
+</style>
+{% endblock %}
+{% block topbar_left %}
+<h1 class="page-title">Ordens de Serviço</h1>
+{% endblock %}
+{% block content %}
+  <section class="stats-row">
+    <div class="stat-card"><div class="stat-title">Total OS</div><div id="osTotalCount" class="stat-value">0</div></div>
+    <div class="stat-card"><div class="stat-title">Em Andamento</div><div id="osInProgressCount" class="stat-value">0</div></div>
+    <div class="stat-card"><div class="stat-title">Concluídas</div><div id="osCompletedCount" class="stat-value">0</div></div>
+    <div class="stat-card"><div class="stat-title">Pendentes</div><div id="osPendingCount" class="stat-value">0</div></div>
+  </section>
+  <section class="filters-section">
+    <div class="filters-header"><div class="filters-title">Filtros</div></div>
+    <div class="filters-grid">
+      <div class="filter-group"><label class="filter-label">Busca</label><input id="searchInput" class="filter-input" placeholder="Buscar (nº OS, atividade, observação)" /></div>
+      <div class="filter-group"><label class="filter-label">Número APR</label><input id="aprInput" class="filter-input" placeholder="Número APR" /></div>
+      <div class="filter-group"><label class="filter-label">ID do Chamado</label><input id="ticketInput" class="filter-input" placeholder="ID do Chamado" /></div>
     </div>
-    </div>
-  </div>
-
-  <script>
-    let currentServiceOrders = []
-    let currentPage = 1
-    let totalPages = 1
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='))
-      if (!hasToken) {
-        window.location.href = '/'
-        return
-      }
-      initializeEventListeners()
-      loadServiceOrderStats()
-      loadServiceOrders()
-    })
-
-    function initializeEventListeners() {
-      document.getElementById('menuToggle').addEventListener('click', toggleSidebar)
-      document.getElementById('applyFiltersBtn').addEventListener('click', applyFilters)
-      document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters)
-      document.getElementById('searchInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') applyFilters() })
-      document.getElementById('aprInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') applyFilters() })
-      document.getElementById('ticketInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') applyFilters() })
-    }
-
-    function toggleSidebar() {
-      const sidebar = document.getElementById('sidebar')
-      const mainContent = document.getElementById('mainContent')
-      sidebar.classList.toggle('collapsed')
-      mainContent.classList.toggle('expanded')
-    }
-
-    async function loadServiceOrders(page = 1) {
-      try {
-        showLoading()
-        const params = new URLSearchParams({ page: page, limit: 20 })
-        const search = document.getElementById('searchInput').value
-        const numero_apr = document.getElementById('aprInput').value
-        const chamado_id = document.getElementById('ticketInput').value
-        if (search) params.append('search', search)
-        if (numero_apr) params.append('numero_apr', numero_apr)
-        if (chamado_id) params.append('chamado_id', chamado_id)
-        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='))
-        const token = tokenCookie ? tokenCookie.split('=')[1] : null
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-        const response = await fetch(`/api/helpdesk/service-orders?${params}`, { credentials: 'include', headers })
-        if (!response.ok) {
-          let msg = 'Erro ao carregar ordens de serviço'
-          try {
-            const err = await response.json()
-            if (response.status === 401) msg = 'Sessão expirada. Faça login novamente.'
-            else if (response.status === 403) msg = 'Sem permissão para visualizar ordens de serviço.'
-            else if (response.status === 400) msg = err.detail || 'Usuário sem empresa associada.'
-            else if (response.status >= 500) msg = 'Erro ao carregar ordens de serviço'
-          } catch {}
-          throw new Error(msg)
-        }
-        const data = await response.json()
-        currentServiceOrders = data.service_orders || []
-        currentPage = data.page || 1
-        totalPages = data.total_pages || 1
-        updateSOCount(data.total || currentServiceOrders.length)
-        renderSOTable()
-        renderPagination()
-      } catch (error) {
-        console.error('Error loading service orders:', error)
-        showError(error.message || 'Erro ao carregar ordens de serviço')
-      }
-    }
-
-    function showLoading() {
-      document.getElementById('serviceOrdersTableContainer').innerHTML = `
-        <div class="loading">
-          <i class="fas fa-spinner fa-spin"></i>
-          <p>Carregando ordens de serviço...</p>
-        </div>
-      `
-    }
-
-    function showError(message) {
-      document.getElementById('serviceOrdersTableContainer').innerHTML = `
-        <div class="empty-state">
-          <i class="fas fa-exclamation-triangle"></i>
-          <h3>Erro</h3>
-          <p>${message}</p>
-        </div>
-      `
-    }
-
-    function renderSOTable() {
-      const container = document.getElementById('serviceOrdersTableContainer')
-      if (currentServiceOrders.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <i class="fas fa-tools"></i>
-            <h3>Nenhuma OS encontrada</h3>
-            <p>Não há ordens que correspondam aos filtros aplicados.</p>
-          </div>
-        `
-        return
-      }
-      const tableHTML = `
-        <table class="tickets-table">
-          <thead>
-            <tr>
-              <th>Número OS</th>
-              <th>Chamado</th>
-              <th>Tipo</th>
-              <th>Início</th>
-              <th>Fim</th>
-              <th>Duração</th>
-              <th>APR</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${currentServiceOrders.map(os => `
-              <tr>
-                <td>${os.numero_os}</td>
-                <td>${os.chamado_id ?? '-'}</td>
-                <td>${os.tipo_os ?? '-'}</td>
-                <td>${os.data_hora_inicio ?? '-'}</td>
-                <td>${os.data_hora_fim ?? '-'}</td>
-                <td>${os.duracao ?? '-'}</td>
-                <td>${os.numero_apr ?? '-'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `
-      container.innerHTML = tableHTML
-    }
-
-    function renderPagination() {
-      const container = document.getElementById('serviceOrdersTableContainer')
-      const pages = []
-      const maxButtons = 7
-      const start = Math.max(1, currentPage - Math.floor(maxButtons / 2))
-      const end = Math.min(totalPages, start + maxButtons - 1)
-      for (let p = start; p <= end; p++) pages.push(p)
-      const paginationHTML = `
-        <div class="pagination">
-          <div class="pagination-info">Página ${currentPage} de ${totalPages}</div>
-          <div class="pagination-controls">
-            ${currentPage > 1 ? `<button class="page-btn" onclick="loadServiceOrders(${currentPage - 1})"><i class="fas fa-chevron-left"></i></button>` : ''}
-            ${pages.map(page => `
-              <button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="loadServiceOrders(${page})">${page}</button>
-            `).join('')}
-            ${currentPage < totalPages ? `<button class="page-btn" onclick="loadServiceOrders(${currentPage + 1})"><i class="fas fa-chevron-right"></i></button>` : ''}
-          </div>
-        </div>
-      `
-      container.insertAdjacentHTML('beforeend', paginationHTML)
-    }
-
-    async function loadServiceOrderStats() {
-      try {
-        const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='))
-        const token = tokenCookie ? tokenCookie.split('=')[1] : null
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-        const response = await fetch('/api/helpdesk/service-orders/analytics', { credentials: 'include', headers })
-        if (!response.ok) return
-        const data = await response.json()
-        document.getElementById('osTotalCount').textContent = data.total_service_orders || 0
-        const comp = data.completion_stats || {}
-        document.getElementById('osInProgressCount').textContent = comp.in_progress || 0
-        document.getElementById('osCompletedCount').textContent = comp.completed || 0
-        document.getElementById('osPendingCount').textContent = comp.pending || 0
-      } catch (error) {
-        console.error('Error loading service order stats:', error)
-      }
-    }
-
-    function updateSOCount(count) {
-      document.getElementById('soCount').textContent = `${count} ordens`
-    }
-
-    function applyFilters() { loadServiceOrders(1) }
-    function clearFilters() {
-      document.getElementById('searchInput').value = ''
-      document.getElementById('aprInput').value = ''
-      document.getElementById('ticketInput').value = ''
-      applyFilters()
-    }
-  </script>
-</body>
-</html>
+    <div class="filter-actions"><button id="applyFiltersBtn" class="btn btn-primary"><i class="fas fa-filter"></i> Aplicar Filtros</button><button id="clearFiltersBtn" class="btn"><i class="fas fa-times"></i> Limpar</button></div>
+  </section>
+  <section class="tickets-section">
+    <div class="tickets-header"><div class="tickets-title">Lista de Ordens de Serviço</div><div id="soCount" class="tickets-count">0 ordens</div></div>
+    <div id="serviceOrdersTableContainer" class="table-container"></div>
+  </section>
+{% endblock %}
+{% block scripts %}
+<script>
+  let currentServiceOrders = []; let currentPage = 1; let totalPages = 1;
+  document.addEventListener('DOMContentLoaded', function() { const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token=')); if (!hasToken) { window.location.href = '/'; return } loadServiceOrderStats(); loadServiceOrders(); document.getElementById('applyFiltersBtn').addEventListener('click', applyFilters); document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters); ['searchInput','aprInput','ticketInput'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('keypress', e => { if (e.key === 'Enter') applyFilters(); }); }); });
+  async function loadServiceOrders(page = 1) {
+    try {
+      showLoading();
+      const params = new URLSearchParams({ page, limit: 20 });
+      const search = document.getElementById('searchInput').value; const numero_apr = document.getElementById('aprInput').value; const chamado_id = document.getElementById('ticketInput').value;
+      if (search) params.append('search', search); if (numero_apr) params.append('numero_apr', numero_apr); if (chamado_id) params.append('chamado_id', chamado_id);
+      const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token=')); const token = tokenCookie ? tokenCookie.split('=')[1] : null; const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch(`/api/helpdesk/service-orders?${params}`, { credentials: 'include', headers });
+      if (!response.ok) { let msg = 'Erro ao carregar ordens de serviço'; try { const err = await response.json(); if (response.status === 401) msg = 'Sessão expirada. Faça login novamente.'; else if (response.status === 403) msg = 'Sem permissão para visualizar ordens de serviço.'; else if (response.status === 400) msg = err.detail || 'Usuário sem empresa associada.'; else if (response.status >= 500) msg = 'Erro ao carregar ordens de serviço'; } catch {} throw new Error(msg); }
+      const data = await response.json(); currentServiceOrders = data.service_orders || []; currentPage = data.page || 1; totalPages = data.total_pages || 1; updateSOCount(data.total || currentServiceOrders.length); renderSOTable(); renderPagination();
+    } catch (error) { console.error('Error loading service orders:', error); showError(error.message || 'Erro ao carregar ordens de serviço'); }
+  }
+  function showLoading() { document.getElementById('serviceOrdersTableContainer').innerHTML = `<div class=\"loading\"><i class=\"fas fa-spinner fa-spin\"></i><p>Carregando ordens de serviço...</p></div>`; }
+  function showError(message) { document.getElementById('serviceOrdersTableContainer').innerHTML = `<div class=\"empty-state\"><i class=\"fas fa-exclamation-triangle\"></i><h3>Erro</h3><p>${message}</p></div>`; }
+  function renderSOTable() {
+    const container = document.getElementById('serviceOrdersTableContainer'); if (currentServiceOrders.length === 0) { container.innerHTML = `<div class=\"empty-state\"><i class=\"fas fa-tools\"></i><h3>Nenhuma OS encontrada</h3><p>Não há ordens que correspondam aos filtros aplicados.</p></div>`; return; }
+    const tableHTML = `<table class=\"tickets-table\"><thead><tr><th>Número OS</th><th>Chamado</th><th>Tipo</th><th>Início</th><th>Fim</th><th>Duração</th><th>APR</th></tr></thead><tbody>${currentServiceOrders.map(os => `<tr><td>${os.numero_os}</td><td>${os.chamado_id ?? '-'}</td><td>${os.tipo_os ?? '-'}</td><td>${os.data_hora_inicio ?? '-'}</td><td>${os.data_hora_fim ?? '-'}</td><td>${os.duracao ?? '-'}</td><td>${os.numero_apr ?? '-'}</td></tr>`).join('')}</tbody></table>`; container.innerHTML = tableHTML; }
+  function renderPagination() {
+    const container = document.getElementById('serviceOrdersTableContainer'); const pages = []; const maxButtons = 7; const start = Math.max(1, currentPage - Math.floor(maxButtons / 2)); const end = Math.min(totalPages, start + maxButtons - 1); for (let p = start; p <= end; p++) pages.push(p); const paginationHTML = `<div class=\"pagination\"><div class=\"pagination-info\">Página ${currentPage} de ${totalPages}</div><div class=\"pagination-controls\">${currentPage > 1 ? `<button class=\"page-btn\" onclick=\"loadServiceOrders(${currentPage - 1})\"><i class=\"fas fa-chevron-left\"></i></button>` : ''}${pages.map(page => `<button class=\"page-btn ${page === currentPage ? 'active' : ''}\" onclick=\"loadServiceOrders(${page})\">${page}</button>`).join('')}${currentPage < totalPages ? `<button class=\"page-btn\" onclick=\"loadServiceOrders(${currentPage + 1})\"><i class=\"fas fa-chevron-right\"></i></button>` : ''}</div></div>`; container.insertAdjacentHTML('beforeend', paginationHTML); }
+  async function loadServiceOrderStats() {
+    try { const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token=')); const token = tokenCookie ? tokenCookie.split('=')[1] : null; const headers = token ? { 'Authorization': `Bearer ${token}` } : {}; const response = await fetch('/api/helpdesk/service-orders/analytics', { credentials: 'include', headers }); if (!response.ok) return; const data = await response.json(); document.getElementById('osTotalCount').textContent = data.total_service_orders || 0; const comp = data.completion_stats || {}; document.getElementById('osInProgressCount').textContent = comp.in_progress || 0; document.getElementById('osCompletedCount').textContent = comp.completed || 0; document.getElementById('osPendingCount').textContent = comp.pending || 0; } catch (error) { console.error('Error loading service order stats:', error); }
+  }
+  function updateSOCount(count) { document.getElementById('soCount').textContent = `${count} ordens`; }
+  function applyFilters() { loadServiceOrders(1); }
+  function clearFilters() { document.getElementById('searchInput').value = ''; document.getElementById('aprInput').value = ''; document.getElementById('ticketInput').value = ''; applyFilters(); }
+</script>
+{% endblock %}

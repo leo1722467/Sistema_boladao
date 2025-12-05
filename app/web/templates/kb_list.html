@@ -1,72 +1,51 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Base de Conhecimento</title>
-  <link rel="stylesheet" href="/static/style.css" />
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <h2>Sistema Boladão</h2>
-      <p>Base de Conhecimento</p>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
-      <a href="/kb" class="nav-item active"><i class="fas fa-book"></i> Base de Conhecimento</a>
-      <a href="/tickets" class="nav-item"><i class="fas fa-ticket-alt"></i> Chamados</a>
-      <a href="/admin/KBArticle" class="nav-item"><i class="fas fa-pen"></i> Gerenciar Artigos</a>
-      <a href="/admin/KBCategory" class="nav-item"><i class="fas fa-folder"></i> Categorias</a>
-    </nav>
-  </div>
-  <div class="main-content" id="mainContent">
-    <div class="top-bar">
-      <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
-      <div class="user-menu">
-        <span id="userGreeting">Base de Conhecimento</span>
-        <div class="user-avatar" id="userAvatar">K</div>
-      </div>
-    </div>
-    <div class="container">
-      <div class="card">
-        <div class="row">
-          <input id="searchInput" class="input" placeholder="Buscar artigos..." />
-          <button class="btn btn-primary" id="searchBtn"><i class="fas fa-search"></i> Buscar</button>
-        </div>
-      </div>
-      <div id="resultsBox" class="card"></div>
+{% extends 'base.html' %}
+{% set sidebar_subtitle = 'Base de Conhecimento' %}
+{% block title %}Base de Conhecimento - Sistema Boladão{% endblock %}
+{% block extra_head %}
+<style>
+  .container { padding:30px; max-width:1200px; }
+  .card { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e9ecef; margin-bottom:20px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .input { flex:1; padding:10px; border:1px solid #e9ecef; border-radius:8px; }
+  .btn { display:inline-flex; align-items:center; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; }
+</style>
+{% endblock %}
+{% block topbar_left %}
+<h1 class="page-title">Base de Conhecimento</h1>
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="row">
+      <input id="searchInput" class="input" placeholder="Buscar artigos..." />
+      <button class="btn btn-primary" id="searchBtn"><i class="fas fa-search"></i> Buscar</button>
     </div>
   </div>
-  <script>
-    document.getElementById('menuToggle').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('collapsed');
-      document.getElementById('mainContent').classList.toggle('expanded');
-    });
-    async function fetchJSON(url) {
-      const tokenCookie = document.cookie.split('; ').find(r => r.startsWith('access_token='));
-      const token = tokenCookie ? tokenCookie.split('=')[1] : null;
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const res = await fetch(url, { credentials:'include', headers });
-      if (!res.ok) throw new Error('Falha: '+res.status);
-      return await res.json();
-    }
-    async function search() {
-      const q = encodeURIComponent(document.getElementById('searchInput').value || '');
-      const items = await fetchJSON(`/api/helpdesk/kb/articles?q=${q}`);
-      const box = document.getElementById('resultsBox');
-      if (!items.length) { box.innerHTML = '<div class="empty-state">Nenhum artigo encontrado</div>'; return; }
-      box.innerHTML = items.map(a => `
-        <div style="padding:10px;border-bottom:1px solid #e9ecef;">
-          <a href="/kb/${a.id}" style="font-weight:600;color:#2c3e50;text-decoration:none;">${a.titulo}</a>
-          <div style="color:#666;margin-top:4px;">${a.resumo || ''}</div>
-        </div>
-      `).join('');
-    }
-    document.getElementById('searchBtn').onclick = search;
-    document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
-    search();
-  </script>
-</body>
-</html>
+  <div id="resultsBox" class="card"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  async function fetchJSON(url) {
+    const tokenCookie = document.cookie.split('; ').find(r => r.startsWith('access_token='));
+    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const res = await fetch(url, { credentials:'include', headers });
+    if (!res.ok) throw new Error('Falha: '+res.status);
+    return await res.json();
+  }
+  async function search() {
+    const q = encodeURIComponent(document.getElementById('searchInput').value || '');
+    const items = await fetchJSON(`/api/helpdesk/kb/articles?q=${q}`);
+    const box = document.getElementById('resultsBox');
+    if (!items.length) { box.innerHTML = '<div class="empty-state">Nenhum artigo encontrado</div>'; return; }
+    box.innerHTML = items.map(a => `
+      <div style="padding:10px;border-bottom:1px solid #e9ecef;">
+        <a href="/kb/${a.id}" style="font-weight:600;color:#2c3e50;text-decoration:none;">${a.titulo}</a>
+        <div style="color:#666;margin-top:4px;">${a.resumo || ''}</div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('searchBtn').onclick = search;
+  document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
+  search();
+</script>
+{% endblock %}
