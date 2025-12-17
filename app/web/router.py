@@ -99,6 +99,10 @@ async def integrations_page(request: Request) -> HTMLResponse:
     """Render integrations management page."""
     return templates.TemplateResponse("integrations.html", {"request": request})
 
+@router.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request) -> HTMLResponse:
+    """Render analytics and reports page."""
+    return templates.TemplateResponse("analytics.html", {"request": request})
 
 @router.get("/inventory", response_class=HTMLResponse)
 async def inventory_page(request: Request) -> HTMLResponse:

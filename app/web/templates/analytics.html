@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Relatórios · Sistema Boladão{% endblock %}
+
+{% block topbar_left %}
+  <h1 style="margin:0; font-size:18px;">Relatórios</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+      <i class="fas fa-chart-line"></i> Visão Geral de Chamados
+    </div>
+    <div class="card-body" id="ticketAnalyticsBox">
+      <div class="loading">Carregando métricas...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <i class="fas fa-tools"></i> Visão Geral de Ordens de Serviço
+    </div>
+    <div class="card-body" id="soAnalyticsBox">
+      <div class="loading">Carregando métricas...</div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function fetchJSON(url, options={}) {
+    const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+    const res = await fetch(url, { credentials: 'include', headers, ...options });
+    if (!res.ok) throw new Error('Erro ao carregar');
+    return await res.json();
+  }
+
+  function renderTicketAnalytics(data) {
+    const box = document.getElementById('ticketAnalyticsBox');
+    const dist = data.status_distribution || {};
+    box.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+        <div class="stat"><div class="stat-title">Total de Chamados</div><div class="stat-value">${data.total_tickets ?? 'n/d'}</div></div>
+        <div class="stat"><div class="stat-title">SLA Estourados</div><div class="stat-value">${data.sla_breaches ?? 0}</div></div>
+        <div class="stat"><div class="stat-title">Abertos</div><div class="stat-value">${dist.open ?? 0}</div></div>
+      </div>
+    `;
+  }
+
+  function renderSOAnalytics(data) {
+    const box = document.getElementById('soAnalyticsBox');
+    box.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+        <div class="stat"><div class="stat-title">Total de OS</div><div class="stat-value">${data.total_service_orders ?? 'n/d'}</div></div>
+        <div class="stat"><div class="stat-title">Taxa de Conclusão</div><div class="stat-value">${Math.round((data.completion_rate||0)*100)}%</div></div>
+        <div class="stat"><div class="stat-title">Tempo Médio</div><div class="stat-value">${data.avg_duration_minutes ?? 0} min</div></div>
+      </div>
+    `;
+  }
+
+  async function loadAnalytics() {
+    try {
+      const ticket = await fetchJSON('/api/helpdesk/analytics');
+      renderTicketAnalytics(ticket);
+    } catch (e) {
+      document.getElementById('ticketAnalyticsBox').innerHTML = '<div class="empty-state">Não foi possível carregar métricas de chamados</div>';
+    }
+    try {
+      const so = await fetchJSON('/api/helpdesk/service-orders/analytics');
+      renderSOAnalytics(so);
+    } catch (e) {
+      document.getElementById('soAnalyticsBox').innerHTML = '<div class="empty-state">Não foi possível carregar métricas de OS</div>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadAnalytics);
+</script>
+{% endblock %}
+

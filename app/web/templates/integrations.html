@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Integrações · Sistema Boladão{% endblock %}
+
+{% block topbar_left %}
+  <h1 style="margin:0; font-size:18px;">Integrações</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+      <i class="fas fa-robot"></i> Status da IA
+    </div>
+    <div class="card-body" id="aiStatusBox">
+      <div class="loading">Carregando status da IA...</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+      <i class="fas fa-link"></i> Webhooks
+    </div>
+    <div class="card-body">
+      <p>Gerencie endpoints de webhook e verifique entregas.</p>
+      <div style="display:flex; gap:8px;">
+        <a href="/admin/helpdesk" class="btn">Abrir Admin Helpdesk</a>
+        <a href="/web/tables" class="btn">Abrir Admin</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <i class="fas fa-broadcast-tower"></i> Eventos
+    </div>
+    <div class="card-body" id="eventsBox">
+      <p>Publicar e inspecionar eventos do sistema.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function fetchJSON(url, options={}) {
+    const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+    const res = await fetch(url, { credentials: 'include', headers, ...options });
+    if (!res.ok) throw new Error('Erro ao carregar');
+    return await res.json();
+  }
+
+  async function loadAIStatus() {
+    const box = document.getElementById('aiStatusBox');
+    try {
+      const data = await fetchJSON('/api/integrations/ai/status');
+      box.innerHTML = `
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+          <div class="stat">
+            <div class="stat-title">Status</div>
+            <div class="stat-value">${data.status || 'desconhecido'}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Modelos</div>
+            <div class="stat-value">${(data.available_models||[]).join(', ') || 'n/d'}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Recursos</div>
+            <div class="stat-value">${Object.keys(data.features||{}).length} ativos</div>
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      box.innerHTML = '<div class="empty-state">Não foi possível obter o status da IA</div>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadAIStatus();
+  });
+</script>
+{% endblock %}
+

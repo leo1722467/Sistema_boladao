@@ -88,6 +88,25 @@ def business_exception_to_http(exc: BusinessLogicError) -> HTTPException:
             detail={"message": exc.message, "type": "tenant_scope_error", **exc.details}
         )
     
+    if isinstance(exc, TicketError):
+        msg = (exc.message or "").lower()
+        det = exc.details or {}
+        err_text = str(det.get("error", "")).lower()
+        if "comment is required" in msg:
+            return HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"message": exc.message, "type": "validation_error", **exc.details}
+            )
+        if "invalid transition" in msg or "insufficient permissions" in msg or "invalid transition" in err_text or "insufficient permissions" in err_text:
+            return HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"message": exc.message, "type": "conflict", **exc.details}
+            )
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": exc.message, "type": "ticket_error", **exc.details}
+        )
+    
     # Default to 500 for other business logic errors
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

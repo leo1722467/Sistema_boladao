@@ -1,99 +1,48 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Novo Chamado - Sistema Boladão</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #fff; line-height: 1.6; }
-    .sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100vh; background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 1000; transition: transform 0.3s ease; overflow-y: auto; }
-    .sidebar.collapsed { transform: translateX(-280px); }
-    .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    .sidebar-header h2 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
-    .sidebar-header p { font-size: 14px; opacity: 0.8; }
-    .sidebar-nav { padding: 20px 0; }
-    .nav-item { display: block; padding: 12px 20px; color: white; text-decoration: none; transition: all 0.3s ease; border-left: 3px solid transparent; }
-    .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); border-left-color: #3498db; }
-    .nav-item i { width: 20px; margin-right: 10px; }
-    .main-content { margin-left: 280px; min-height: 100vh; transition: margin-left 0.3s ease; }
-    .main-content.expanded { margin-left: 0; }
-    .top-bar { background: #0b1220; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; position: relative; }
-    .top-bar > div:first-child { position: absolute; left: 24px; }
-    .menu-toggle { background: none; border: none; font-size: 20px; cursor: pointer; color: #9aa4b2; }
-    .page-title { font-size: 30px; font-weight: 800; color: #e2e8f0; text-align: center; }
-    .container { padding: 0; max-width: none; }
-    .game-slider { position: relative; width: calc(100vw - 280px); height: calc(100vh - 64px); overflow: hidden; }
-    .slides { display: flex; width: calc(100%); height: 100%; transition: transform 0.5s ease-in-out; }
-    .slide { flex: 0 0 100%; display: flex; flex-direction: column; gap: 14px; padding: 0; align-content: stretch; font-size: 20px; font-weight: bold; height: 100%;}
-    .slide-title {
-    font-size: 28px;
-    font-weight: 800;
-    text-align: center;
-    margin-bottom: 16px;
-    color: #fff;
-}
-
-    .square { border-radius: 16px; padding: 14px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
-    .sq-blue { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
-    .sq-green { background: linear-gradient(135deg, #166534, #22c55e); }
-    .sq-orange { background: linear-gradient(135deg, #7c2d12, #f59e0b); }
-    .sq-purple { background: linear-gradient(135deg, #5b21b6, #a78bfa); }
-    .sq-pink { background: linear-gradient(135deg, #9d174d, #ec4899); }
-    .sq-slate { background: linear-gradient(135deg, #1f2937, #64748b); }
-    .square h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff; text-align: center; }
-    .input, .select, .textarea { width: 100%; height: auto; padding: 8px 10px; border: none; border-radius: 10px; font-size: 14px; background: rgba(255,255,255,0.12); color: #fff; text-align: center; }
-    .side-controls { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; }
-    .side-left { left: 0; }
-    .side-right { right: 0; }
-    .side-btn { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 100%; border: none; border-radius: 0; background: rgba(255,255,255,0.12); color: #e2e8f0; cursor: pointer; }
-    .btn { display: inline-flex; align-items: center; padding: 10px 18px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.2s ease; }
-    .btn-primary { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; }
-    .btn-ghost { background: rgba(255,255,255,0.12); color: #e2e8f0; }
-    .btn:hover { transform: translateY(-2px); }
-    .progress { position: absolute; left: 24px; bottom: 24px; display: flex; gap: 10px; }
-    .dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.25); cursor: pointer; }
-    .dot.active { background: #3b82f6; }
-    .empty-state { text-align: center; padding: 40px 20px; color: #e2e8f0; }
-    .center-step {display: flex; flex: 1; align-items: stretch; justify-content: center; flex: 1; display: flex;}
-
-    .center-box { width: 100%; max-width: none; height: 100%; display: flex; }
-    .square { height: 100%; width: 100%; display: flex; flex-direction: column; flex: 1; }
-    .textarea { flex: 1; resize: none; }
-    .options-grid { display: grid; gap: 12px; height: 100%; align-content: stretch; grid-auto-rows: 120px; }
-    .option-btn { display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.12); color: #fff; font-weight: 600; cursor: pointer; border: 2px solid transparent; height: 100%; }
-    .option-btn.active { border-color: #3b82f6; }
-  </style>
-</head>
-<body>
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <h2>Sistema Boladão</h2>
-      <p>Novo Chamado</p>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="/dashboard" class="nav-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
-      <a href="/tickets" class="nav-item active"><i class="fas fa-ticket-alt"></i> Chamados</a>
-      <a href="/assets" class="nav-item"><i class="fas fa-desktop"></i> Ativos</a>
-      <a href="/service-orders" class="nav-item"><i class="fas fa-tools"></i> Ordens de Serviço</a>
-      <a href="/inventory" class="nav-item"><i class="fas fa-boxes"></i> Estoque</a>
-      <a href="/integrations" class="nav-item"><i class="fas fa-plug"></i> Integrações</a>
-      <a href="/web/tables" class="nav-item"><i class="fas fa-database"></i> Admin</a>
-    </nav>
-  </div>
-
-  <div class="main-content" id="mainContent">
-    <div class="top-bar">
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
-        <h1 class="page-title">Novo Chamado</h1>
-      </div>
-      <div></div>
-    </div>
-
-    <div class="container">
-      <div class="game-slider">
+{% extends 'base.html' %}
+{% block title %}Novo Chamado - Sistema Boladão{% endblock %}
+{% block extra_head %}
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  .container { padding: 0; max-width: none; }
+  .game-slider { position: relative; width: 100%; height: calc(100vh - 64px); overflow: hidden; }
+  .slides { display: flex; width: 100%; height: 100%; transition: transform 0.5s ease-in-out; }
+  .slide { flex: 0 0 100%; display: flex; flex-direction: column; gap: 14px; padding: 0; align-content: stretch; font-size: 20px; font-weight: bold; height: 100%; }
+  .slide-title { font-size: 28px; font-weight: 800; text-align: center; margin-bottom: 16px; }
+  .square { border-radius: 16px; padding: 14px; box-shadow: 0 10px 28px rgba(0,0,0,0.15); }
+  .sq-blue { background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: #fff; }
+  .sq-green { background: linear-gradient(135deg, #166534, #22c55e); color: #fff; }
+  .sq-orange { background: linear-gradient(135deg, #7c2d12, #f59e0b); color: #fff; }
+  .sq-purple { background: linear-gradient(135deg, #5b21b6, #a78bfa); color: #fff; }
+  .sq-pink { background: linear-gradient(135deg, #9d174d, #ec4899); color: #fff; }
+  .sq-slate { background: linear-gradient(135deg, #1f2937, #64748b); color: #fff; }
+  .square h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; text-align: center; }
+  .input, .select, .textarea { width: 100%; height: auto; padding: 8px 10px; border: none; border-radius: 10px; font-size: 14px; background: rgba(255,255,255,0.12); color: #fff; text-align: center; }
+  .side-controls { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; }
+  .side-left { left: 0; }
+  .side-right { right: 0; }
+  .side-btn { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 100%; border: none; border-radius: 0; background: rgba(0,0,0,0.06); color: #0b0f19; cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; padding: 10px 18px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.2s ease; }
+  .btn-primary { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; }
+  .btn-ghost { background: rgba(0,0,0,0.06); color: #0b0f19; }
+  .btn:hover { transform: translateY(-2px); }
+  .progress { position: absolute; left: 24px; bottom: 24px; display: flex; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(0,0,0,0.12); cursor: pointer; }
+  .dot.active { background: #3b82f6; }
+  .empty-state { text-align: center; padding: 40px 20px; }
+  .center-step { display: flex; flex: 1; align-items: stretch; justify-content: center; }
+  .center-box { width: 100%; max-width: none; height: 100%; display: flex; }
+  .square { height: 100%; width: 100%; display: flex; flex-direction: column; flex: 1; }
+  .textarea { flex: 1; resize: none; }
+  .options-grid { display: grid; gap: 12px; height: 100%; align-content: stretch; grid-auto-rows: 120px; }
+  .option-btn { display: flex; align-items: center; justify-content: center; padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.12); color: #fff; font-weight: 600; cursor: pointer; border: 2px solid transparent; height: 100%; }
+  .option-btn.active { border-color: #3b82f6; }
+</style>
+{% endblock %}
+{% block topbar_left %}
+<h1 class="page-title">Novo Chamado</h1>
+{% endblock %}
+{% block content %}
+  <div class="game-slider">
         <div id="slides" class="slides">
           <div class="slide"><div class="center-step">Tipo de Ativo</div><div class="options-grid" id="tipoGrid"></div></div>
           <div class="slide"><div class="center-step">Local de Instalação</div><div class="options-grid" id="localGrid"></div></div>
@@ -124,14 +73,12 @@
         </div>
       </div>
       <div id="resultBox" class="empty-state" style="display:none;"></div>
-    </div>
-  </div>
-
-  <script>
+{% endblock %}
+{% block scripts %}
+<script>
     document.addEventListener('DOMContentLoaded', async function() {
       const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='))
       if (!hasToken) { window.location.href = '/'; return }
-      document.getElementById('menuToggle').addEventListener('click', toggleSidebar)
       window.addEventListener('error', (e) => { try { console.error('Unhandled error:', e.message, e.error || null) } catch {} })
       window.addEventListener('unhandledrejection', (e) => { try { console.error('Unhandled rejection:', e.reason) } catch {} })
       await loadOptions()
@@ -146,13 +93,6 @@
       } catch (err) {
         console.error('Fetch error (body parse failed)', { url, status: res.status, statusText: res.statusText, payload })
       }
-    }
-
-    function toggleSidebar() {
-      const sidebar = document.getElementById('sidebar')
-      const mainContent = document.getElementById('mainContent')
-      sidebar.classList.toggle('collapsed')
-      mainContent.classList.toggle('expanded')
     }
 
     let prOpts = []
@@ -377,5 +317,4 @@
     for (let i = 0; i < 7; i++) { const d = document.getElementById('dot' + i); if (d) d.addEventListener('click', () => goToSlide(i)) }
     updateSlider()
   </script>
-</body>
-</html>
+{% endblock %}

@@ -1,6 +1,7 @@
 let currentSchema = null;
 let modalStack = [];
 let modalCounter = 0;
+let modalOpening = false;
 
 async function inferColumns(model, isMainForm = false) {
   // Get access token from cookie
@@ -170,6 +171,10 @@ async function buildForm() {
 }
 
 async function openCreateRelatedModal(targetModel, selectElement) {
+  if (modalOpening || modalStack.length > 0 || document.querySelector('.modal-overlay')) {
+    return;
+  }
+  modalOpening = true;
   modalCounter++;
   const modalId = `modal-${modalCounter}`;
   const baseZIndex = 1000;
@@ -226,6 +231,7 @@ async function openCreateRelatedModal(targetModel, selectElement) {
   
   // Build the form for the related model
   await buildRelatedForm(targetModel, modalCounter);
+  modalOpening = false;
 }
 
 function closeModal(modalId) {
@@ -235,6 +241,7 @@ function closeModal(modalId) {
     // Remove from stack
     modalStack = modalStack.filter(m => m.id !== modalId);
   }
+  modalOpening = false;
 }
 
 async function buildRelatedForm(model, modalCounter) {

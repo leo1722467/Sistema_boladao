@@ -3,6 +3,7 @@ const accessToken = tokenCookie ? tokenCookie.split('=')[1] : null;
 
 let modalStack = [];
 let modalCounter = 0;
+let modalOpening = false;
 
 async function loadForeignKeyOptions(model, field) {
   try {
@@ -64,9 +65,14 @@ function closeModal(modalId) {
     // Remove from stack
     modalStack = modalStack.filter(m => m.id !== modalId);
   }
+  modalOpening = false;
 }
 
 async function showCreateRelatedModal(relatedModel, fieldName, selectElement) {
+  if (modalOpening || modalStack.length > 0 || document.querySelector('.modal-overlay')) {
+    return;
+  }
+  modalOpening = true;
   modalCounter++;
   const modalId = `modal-${modalCounter}`;
   const baseZIndex = 1000;
@@ -127,6 +133,7 @@ async function showCreateRelatedModal(relatedModel, fieldName, selectElement) {
   
   // Build the form for the related model
   await buildRelatedForm(relatedModel, modalCounter);
+  modalOpening = false;
 }
 
 async function inferColumns(model) {

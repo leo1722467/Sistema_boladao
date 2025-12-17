@@ -11,7 +11,7 @@ from app.core.tenant import get_tenant_context, TenantContext
 from app.core.authorization import (
     get_authorization_context, AuthorizationContext,
     Permission, require_agent_or_admin_role, require_any_authenticated_role,
-    ResourceOwnershipValidator
+    ResourceOwnershipValidator, UserRole
 )
 from app.core.exceptions import business_exception_to_http, BusinessLogicError
 from app.repositories.ativo import AtivoRepository
@@ -662,7 +662,7 @@ async def get_ticket_analytics(
     """
     try:
         # Check permission
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             if not auth_context.has_permission(Permission.VIEW_OWN_TICKETS):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -676,7 +676,7 @@ async def get_ticket_analytics(
                 )
         
         # For requesters, always show only their analytics
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             user_specific = True
         
         ticket_svc = TicketService()

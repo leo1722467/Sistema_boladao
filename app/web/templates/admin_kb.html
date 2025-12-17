@@ -43,14 +43,14 @@
     const token = getToken();
     const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' };
     const res = await fetch(url, { credentials:'include', headers, ...opts });
-    if (res.redirected && res.url && res.url.includes('/web/login')) {
-      window.location.href = '/web/login';
-      throw new Error('Not authenticated');
-    }
-    if (!res.ok) {
-      if (res.status === 401) { window.location.href = '/web/login'; throw new Error('Not authenticated'); }
-      throw new Error('Falha: '+res.status);
-    }
+      if (res.redirected) {
+        window.location.href = '/';
+        throw new Error('Not authenticated');
+      }
+      if (!res.ok) {
+        if (res.status === 401) { window.location.href = '/'; throw new Error('Not authenticated'); }
+        throw new Error('Falha: '+res.status);
+      }
     return await res.json();
   }
   async function loadArticles() {

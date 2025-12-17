@@ -398,7 +398,7 @@ class TicketService:
             
             return ticket
             
-        except (NotFoundError, TicketError, ValidationError):
+        except (NotFoundError, TicketError, ValidationError, ConflictError):
             raise
         except Exception as e:
             logger.exception(f"Unexpected error updating ticket {ticket_id}: {e}")

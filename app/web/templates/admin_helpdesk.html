@@ -71,12 +71,12 @@
     const baseHeaders = {'Content-Type':'application/json'};
     if (token) baseHeaders['Authorization'] = `Bearer ${token}`;
     const res = await fetch(url, {credentials:'include', headers: baseHeaders, ...opts});
-    if (res.redirected && res.url && res.url.includes('/web/login')) {
-      window.location.href = '/web/login';
+    if (res.redirected) {
+      window.location.href = '/';
       return Promise.reject(new Error('Not authenticated'));
     }
     if (!res.ok) {
-      if (res.status === 401) { window.location.href = '/web/login'; return Promise.reject(new Error('Not authenticated')); }
+      if (res.status === 401) { window.location.href = '/'; return Promise.reject(new Error('Not authenticated')); }
       throw new Error('Falha: '+res.status);
     }
     return await res.json();
@@ -172,7 +172,8 @@
     priorities.forEach(p => {
       let ov = window.__sla.find(o => o.prioridade_id === p.id); if (!ov) { ov = {prioridade_id: p.id, response_hours: 24, resolution_hours: 72, escalation_hours: 48}; window.__sla.push(ov); }
       const elResp = input('response_hours', ov.response_hours, 'number'); const elRes = input('resolution_hours', ov.resolution_hours, 'number'); const elEsc = input('escalation_hours', ov.escalation_hours, 'number');
-      const rEl = row([{label:'Prioridade: '+p.nome, el: document.createElement('div')},{label:'Resposta (h)', el: elResp},{label:'Resolução (h)', el: elRes},{label:'Escalonamento (h)', el: elEsc}]);
+      const elPriName = input('prioridade_nome', p.nome); elPriName.disabled = true;
+      const rEl = row([{label:'Prioridade', el: elPriName},{label:'Resposta (h)', el: elResp},{label:'Resolução (h)', el: elRes},{label:'Escalonamento (h)', el: elEsc}]);
       box.appendChild(rEl);
       elResp.oninput = () => ov.response_hours = parseInt(elResp.value || '0'); elRes.oninput = () => ov.resolution_hours = parseInt(elRes.value || '0'); elEsc.oninput = () => ov.escalation_hours = parseInt(elEsc.value || '0');
     });

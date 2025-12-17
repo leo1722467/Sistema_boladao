@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import TicketError, ValidationError
+from app.core.exceptions import TicketError, ValidationError, ConflictError
 from app.db.models import Chamado, StatusChamado, Prioridade
 
 logger = logging.getLogger(__name__)
@@ -162,21 +162,21 @@ class TicketWorkflowEngine:
                 break
         
         if not transition:
-            raise TicketError(
+            raise ConflictError(
                 f"Invalid transition from '{current_status}' to '{new_status}'",
                 {"current_status": current_status, "new_status": new_status}
             )
         
         # Check role requirements
         if transition.required_role and user_role not in ["admin", transition.required_role]:
-            raise TicketError(
+            raise ConflictError(
                 f"Insufficient permissions for transition to '{new_status}'. Required role: {transition.required_role}",
                 {"required_role": transition.required_role, "user_role": user_role}
             )
         
         # Check comment requirements
         if transition.requires_comment and (not comment or not comment.strip()):
-            raise TicketError(
+            raise ValidationError(
                 f"Comment is required for transition to '{new_status}'",
                 {"transition": f"{current_status} -> {new_status}"}
             )

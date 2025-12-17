@@ -70,7 +70,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             if self._is_api(path):
                 # Clientes de API esperam 401 JSON, não redirect.
                 return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-            # Para rotas web, redireciona para a página de login
-            return RedirectResponse(url="/web/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
         return await call_next(request)

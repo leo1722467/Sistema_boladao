@@ -67,7 +67,7 @@ class AuthManager {
             });
 
             this.isCheckingAuth = false;
-            if (response.redirected && response.url && response.url.includes('/web/login')) {
+            if (response.redirected) {
                 return false;
             }
             return response.ok;
@@ -102,7 +102,7 @@ class AuthManager {
         document.cookie = 'access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         
         // Redirect to login
-        window.location.href = '/web/login';
+        window.location.href = '/';
     }
 
     /**
@@ -202,7 +202,7 @@ window.authManager = authManager;
     window.fetch = async function(input, init) {
         try {
             const res = await _fetch(input, init);
-            if (res && (res.status === 401 || (res.redirected && res.url && res.url.includes('/web/login')))) {
+            if (res && (res.status === 401 || res.redirected)) {
                 authManager.redirectToLogin();
             }
             return res;
