@@ -301,7 +301,35 @@ class TicketWorkflowEngine:
         Returns:
             List of suggested actions with descriptions
         """
-        current_status = TicketStatus(ticket.status.nome.lower()) if ticket.status else TicketStatus.NEW
+        def _norm(s: Optional[str]) -> str:
+            return {
+                "novo": "new",
+                "new": "new",
+                "aberto": "open",
+                "open": "open",
+                "em andamento": "in_progress",
+                "em atendimento": "in_progress",
+                "in_progress": "in_progress",
+                "em espera": "pending_customer",
+                "espera": "pending_customer",
+                "aguardando": "pending_customer",
+                "aguardando cliente": "pending_customer",
+                "pending_customer": "pending_customer",
+                "pendente fornecedor": "pending_vendor",
+                "pending_vendor": "pending_vendor",
+                "resolvido": "resolved",
+                "resolved": "resolved",
+                "fechado": "closed",
+                "closed": "closed",
+                "cancelado": "cancelled",
+                "cancelled": "cancelled",
+            }.get((s or "").strip().lower(), (s or "").strip().lower())
+
+        current_code = _norm(ticket.status.nome if getattr(ticket, "status", None) else "new")
+        try:
+            current_status = TicketStatus(current_code)
+        except ValueError:
+            current_status = TicketStatus.NEW
         valid_transitions = self.get_valid_transitions(current_status, user_role)
         
         actions = []

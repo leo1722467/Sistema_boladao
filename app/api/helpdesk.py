@@ -339,8 +339,7 @@ async def list_tickets(
     Requires view tickets permission.
     """
     try:
-        # Check permission
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             if not auth_context.has_permission(Permission.VIEW_OWN_TICKETS):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -398,8 +397,7 @@ async def list_tickets(
                     if contact:
                         filters["agente_contato_id"] = contact.id
         
-        # For requesters, only show their own tickets
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             filters["requisitante_contato_id"] = auth_context.user.contato_id
         
         # Compute offset from page
@@ -474,12 +472,18 @@ async def get_ticket(
     Get detailed ticket information with workflow context.
     """
     try:
-        # Check permission
-        if not auth_context.has_permission(Permission.VIEW_TICKETS):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions to view tickets"
-            )
+        if auth_context.role == UserRole.REQUESTER:
+            if not auth_context.has_permission(Permission.VIEW_OWN_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view own tickets"
+                )
+        else:
+            if not auth_context.has_permission(Permission.VIEW_TICKETS):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to view tickets"
+                )
         
         ticket_svc = TicketService()
         ticket = await ticket_svc.get_by_id(
@@ -492,8 +496,7 @@ async def get_ticket(
                 detail=f"Ticket with ID {ticket_id} not found"
             )
         
-        # Check if requester can only view their own tickets
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             if ticket.requisitante_contato_id != auth_context.user.contato_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -506,7 +509,11 @@ async def get_ticket(
         except Exception:
             pass
         ticket_detail = await _build_ticket_detail_response(
-            session, ticket, auth_context.role, include_sla=True, include_actions=True
+            session,
+            ticket,
+            (auth_context.role.value if hasattr(auth_context.role, "value") else str(auth_context.role)),
+            include_sla=True,
+            include_actions=True
         )
         
         logger.debug(f"Retrieved ticket {ticket.numero} for user {auth_context.user.id}")
@@ -550,16 +557,13 @@ async def update_ticket(
     Update a ticket with comprehensive workflow validation.
     """
     try:
-        # Check permission
         if not auth_context.has_permission(Permission.MANAGE_TICKETS):
-            # Requesters can only update their own tickets with limited fields
-            if auth_context.role != "requester":
+            if auth_context.role != UserRole.REQUESTER:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Insufficient permissions to update tickets"
                 )
-        # If requester, ensure they are the ticket owner (requisitante)
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             # Load ticket with cross-tenant access for attendants only
             tsvc_chk = TicketService()
             ticket_chk = await tsvc_chk.get_by_id(session, auth_context.tenant.empresa_id, ticket_id)
@@ -593,8 +597,7 @@ async def update_ticket(
             # Fail-safe: if mapping fails, continue with provided IDs only
             pass
         
-        # Requesters can only send comments; no field updates allowed
-        if auth_context.role == "requester":
+        if auth_context.role == UserRole.REQUESTER:
             if updates:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -608,7 +611,7 @@ async def update_ticket(
             empresa_id=1 if auth_context.tenant.empresa_id == 1 else auth_context.tenant.empresa_id,
             ticket_id=ticket_id,
             user_id=auth_context.user.contato_id,
-            user_role=auth_context.role,
+            user_role=(auth_context.role.value if hasattr(auth_context.role, "value") else str(auth_context.role)),
             updates=updates,
             comment=payload.comment
         )
@@ -621,7 +624,11 @@ async def update_ticket(
         except Exception:
             pass
         ticket_detail = await _build_ticket_detail_response(
-            session, updated_ticket, auth_context.role, include_sla=True, include_actions=True
+            session,
+            updated_ticket,
+            (auth_context.role.value if hasattr(auth_context.role, "value") else str(auth_context.role)),
+            include_sla=True,
+            include_actions=True
         )
         
         logger.info(f"Updated ticket {updated_ticket.numero} by user {auth_context.user.id}")
@@ -803,7 +810,7 @@ async def _build_ticket_detail_response(
         "agente": ({"id": agente_rel.id, "nome": agente_rel.nome} if agente_rel else None),
         "criado_em": created.isoformat(),
         "atualizado_em": updated.isoformat(),
-        "fechado_em": ticket.fechado_em.isoformat() if ticket.fechado_em else None,
+        "fechado_em": (ticket.fechado_em.isoformat() if getattr(ticket.fechado_em, "isoformat", None) else (str(ticket.fechado_em) if ticket.fechado_em else None)),
     }
     # Add comments history
     try:

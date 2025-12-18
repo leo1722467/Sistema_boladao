@@ -643,11 +643,13 @@
         
         let ticket;
         if (!response.ok) {
-          // Graceful fallback: use in-memory ticket data when 403/404
-          if (response.status === 403 || response.status === 404) {
+          // Graceful fallback: use in-memory ticket data when API fails (403/404/500)
+          if (response.status === 403 || response.status === 404 || response.status === 500) {
             ticket = currentTickets.find(t => t.id === id);
             if (!ticket) {
-              let msg = response.status === 403 ? 'Sem permissão para visualizar chamado.' : 'Chamado não encontrado.';
+              let msg = 'Sem permissão para visualizar chamado.';
+              if (response.status === 404) msg = 'Chamado não encontrado.';
+              if (response.status === 500) msg = 'Erro interno ao carregar chamado. Tentando dados em cache.';
               throw new Error(msg);
             }
           } else if (response.status === 401) {

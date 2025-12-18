@@ -12,7 +12,7 @@ from app.repositories.chamado import ChamadoRepository
 from app.db.models import Chamado, StatusChamado, Prioridade, ChamadoComentario, ChamadoLog
 from app.core.ticket_workflow import TicketWorkflowEngine, TicketStatus, TicketPriority
 from app.core.exceptions import (
-    TicketError, ValidationError, NotFoundError, 
+    TicketError, ValidationError, NotFoundError, ConflictError,
     ErrorHandler, TenantScopeError
 )
 
