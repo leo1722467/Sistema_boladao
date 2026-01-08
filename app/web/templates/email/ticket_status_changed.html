@@ -1,0 +1,9 @@
+<div style="font-family:Arial, sans-serif; color:#333;">
+  <h2>Status do Chamado Atualizado</h2>
+  <p><strong>Número:</strong> {{ numero }}</p>
+  <p><strong>De:</strong> {{ old_status }} → <strong>Para:</strong> {{ new_status }}</p>
+  {% if comment %}
+  <p><strong>Comentário:</strong> {{ comment }}</p>
+  {% endif %}
+  <p><a href="http://localhost:8081/tickets" style="color:#1d4ed8;">Abrir lista de chamados</a></p>
+</div>

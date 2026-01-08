@@ -1,0 +1,9 @@
+<div style="font-family:Arial, sans-serif; color:#333;">
+  <h2>Chamado Aguardando Cliente</h2>
+  <p><strong>Número:</strong> {{ numero }}</p>
+  {% if comment %}
+  <p><strong>Comentário:</strong> {{ comment }}</p>
+  {% endif %}
+  <p>Por favor, responda esta mensagem para prosseguirmos com o atendimento.</p>
+  <p><a href="http://localhost:8081/tickets" style="color:#1d4ed8;">Abrir lista de chamados</a></p>
+</div>

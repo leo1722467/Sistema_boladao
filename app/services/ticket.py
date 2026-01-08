@@ -15,6 +15,10 @@ from app.core.exceptions import (
     TicketError, ValidationError, NotFoundError, ConflictError,
     ErrorHandler, TenantScopeError
 )
+from app.services.notification_email import EmailNotifier
+from app.core.helpdesk_config import load_notifications_config
+from sqlalchemy import select
+from app.db.models import Contato, Empresa
 
 logger = logging.getLogger(__name__)
 
@@ -263,85 +267,21 @@ class TicketService:
             # Track changes for audit log
             changes = {}
             
-            # Handle status changes with workflow validation
+            # Handle status changes without strict workflow validation
             if "status_id" in updates:
                 new_status_id = updates["status_id"]
                 if new_status_id != ticket.status_id:
-                    # Special-case: NEW -> PENDING_CUSTOMER should pass through IN_PROGRESS
+                    changes["status_id"] = {"from": ticket.status_id, "to": new_status_id}
+                    ticket.status_id = new_status_id
                     try:
-                        current_status_name = ticket.status.nome.lower() if ticket.status else "new"
-                        # Resolve target status name
                         tgt = await session.get(StatusChamado, new_status_id)
-                        target_name = tgt.nome.lower() if tgt else ""
-                        # Normalize to english labels used by workflow
-                        norm = lambda s: {
-                            "novo": "new",
-                            "new": "new",
-                            "aberto": "open",
-                            "open": "open",
-                            "em andamento": "in_progress",
-                            "em atendimento": "in_progress",
-                            "in_progress": "in_progress",
-                            "em espera": "pending_customer",
-                            "espera": "pending_customer",
-                            "aguardando": "pending_customer",
-                            "aguardando cliente": "pending_customer",
-                            "pending_customer": "pending_customer",
-                            "resolvido": "resolved",
-                            "resolved": "resolved",
-                            "fechado": "closed",
-                            "closed": "closed",
-                        }.get((s or "").strip().lower(), (s or "").strip().lower())
-
-                        cur_code = norm(current_status_name)
-                        tgt_code = norm(target_name)
-
-                        if cur_code == "new" and tgt_code == "pending_customer":
-                            # Business rule: from NEW, move to OPEN first; do NOT jump to PENDING_CUSTOMER
-                            open_status = await self._get_default_status(session, "open")
-                            if open_status:
-                                await self._validate_status_transition(session, ticket, open_status.id, user_role, comment)
-                                if ticket.status_id != open_status.id:
-                                    changes["status_id"] = {"from": ticket.status_id, "to": open_status.id}
-                                    ticket.status_id = open_status.id
-                                    await session.flush()
-                                    try:
-                                        await session.refresh(ticket, ["status"]) 
-                                    except Exception:
-                                        pass
-                            # Do not proceed to pending_customer directly; require further action later
-                            pass
-                        else:
-                            await self._validate_status_transition(
-                                session, ticket, new_status_id, user_role, comment
-                            )
-                            changes["status_id"] = {"from": ticket.status_id, "to": new_status_id}
-                            ticket.status_id = new_status_id
-                            try:
-                                tgt = await session.get(StatusChamado, new_status_id)
-                                tgt_name = (tgt.nome or "").strip().lower() if tgt else ""
-                                if tgt_name in ["in_progress", "em andamento", "em atendimento"]:
-                                    if not ticket.agente_contato_id and user_role in ["admin", "agent"]:
-                                        ticket.agente_contato_id = user_id
-                                        changes["agente_contato_id"] = {"from": None, "to": user_id}
-                            except Exception:
-                                pass
+                        tgt_name = (tgt.nome or "").strip().lower() if tgt else ""
+                        if tgt_name in ["in_progress", "em andamento", "em atendimento"]:
+                            if not ticket.agente_contato_id and user_role in ["admin", "agent"]:
+                                ticket.agente_contato_id = user_id
+                                changes["agente_contato_id"] = {"from": None, "to": user_id}
                     except Exception:
-                        # fall back to single-step validation
-                        await self._validate_status_transition(
-                            session, ticket, new_status_id, user_role, comment
-                        )
-                        changes["status_id"] = {"from": ticket.status_id, "to": new_status_id}
-                        ticket.status_id = new_status_id
-                        try:
-                            tgt = await session.get(StatusChamado, new_status_id)
-                            tgt_name = (tgt.nome or "").strip().lower() if tgt else ""
-                            if tgt_name in ["in_progress", "em andamento", "em atendimento"]:
-                                if not ticket.agente_contato_id and user_role in ["admin", "agent"]:
-                                    ticket.agente_contato_id = user_id
-                                    changes["agente_contato_id"] = {"from": None, "to": user_id}
-                        except Exception:
-                            pass
+                        pass
 
             # Handle assignment changes
             if "agente_contato_id" in updates:
@@ -373,16 +313,13 @@ class TicketService:
             # Add comment if provided
             if comment and comment.strip():
                 await self._add_comment(session, ticket.id, user_id, comment.strip())
-                # Auto progress status to in_progress when there is activity
                 try:
                     current_status_name = ticket.status.nome.lower() if ticket.status else "new"
                     if current_status_name in ["new", "open"]:
                         target = await self._get_default_status(session, "in_progress")
-                        if target:
-                            await self._validate_status_transition(session, ticket, target.id, user_role, comment)
-                            if ticket.status_id != target.id:
-                                changes["status_id"] = {"from": ticket.status_id, "to": target.id}
-                                ticket.status_id = target.id
+                        if target and ticket.status_id != target.id:
+                            changes["status_id"] = {"from": ticket.status_id, "to": target.id}
+                            ticket.status_id = target.id
                 except Exception:
                     pass
             
@@ -395,6 +332,92 @@ class TicketService:
             
             await session.flush()
             logger.info(f"Updated ticket {ticket.numero} by user {user_id}")
+            try:
+                notifier = EmailNotifier()
+                # Build common context
+                ctx = {
+                    "numero": str(ticket.numero or ""),
+                    "titulo": str(ticket.titulo or ""),
+                    "descricao": ticket.descricao,
+                    "prioridade": (ticket.prioridade.nome if ticket.prioridade else None),
+                    "old_status": None,
+                    "new_status": None,
+                    "comment": (comment or "").strip() if comment else None,
+                    "agente_nome": (ticket.agente.nome if ticket.agente else None),
+                }
+                # Resolve recipients
+                def _email_of(contato_id: Optional[int]) -> Optional[str]:
+                    # Best-effort: relationships may be loaded; otherwise skip
+                    rel = None
+                    try:
+                        if contato_id and ticket.agente and ticket.agente.id == contato_id:
+                            rel = ticket.agente
+                        elif contato_id and ticket.requisitante and ticket.requisitante.id == contato_id:
+                            rel = ticket.requisitante
+                    except Exception:
+                        rel = None
+                    return getattr(rel, "email", None) if rel else None
+                requester = _email_of(ticket.requisitante_contato_id)
+                agent = _email_of(ticket.agente_contato_id)
+                # Event notifications
+                if "status_id" in changes:
+                    ctx["old_status"] = (await session.get(StatusChamado, changes["status_id"]["from"])).nome if changes["status_id"]["from"] else None
+                    ctx["new_status"] = (await session.get(StatusChamado, changes["status_id"]["to"])).nome if changes["status_id"]["to"] else None
+                    to = [agent, requester]
+                    notifier.send_status_changed([t for t in to if t], ctx)
+                    # SLA checks for support team alerts
+                    try:
+                        sla = self.workflow.check_sla_breaches(ticket)
+                        cfg = load_notifications_config()
+                        team_ids = (cfg.get("sla", {}).get("team_contact_ids") or [])
+                        # company-specific rules
+                        try:
+                            rules = cfg.get("sla", {}).get("company_rules") or []
+                            for r in rules:
+                                try:
+                                    if int(r.get("empresa_id")) == int(getattr(ticket, "empresa_id", 0)):
+                                        team_ids = list(set(team_ids + (r.get("contact_ids") or [])))
+                                except Exception:
+                                    continue
+                        except Exception:
+                            pass
+                        # resolve emails
+                        team = []
+                        if team_ids:
+                            try:
+                                res = await session.execute(select(Contato).where(Contato.id.in_(team_ids)))
+                                for c in res.scalars().all():
+                                    if c and getattr(c, "email", None) and "@" in str(c.email):
+                                        team.append(str(c.email))
+                            except Exception:
+                                pass
+                        if sla.get("response_breach"):
+                            notifier.send_sla_response_breach(team, ctx)
+                        if sla.get("resolution_breach"):
+                            notifier.send_sla_resolution_breach(team, ctx)
+                        if sla.get("escalation_needed"):
+                            notifier.send_sla_escalation_needed(team, ctx)
+                    except Exception:
+                        pass
+                if "agente_contato_id" in changes:
+                    to = [agent]
+                    notifier.send_assigned([t for t in to if t], ctx)
+                # Pending customer
+                try:
+                    if ticket.status and str(ticket.status.nome).strip().lower() in ["pendente cliente", "pending_customer", "em espera", "aguardando cliente"]:
+                        to = [requester]
+                        notifier.send_pending_customer([t for t in to if t], ctx)
+                except Exception:
+                    pass
+                # Concluded
+                try:
+                    if ticket.status and str(ticket.status.nome).strip().lower() in ["concluído", "concluido", "closed", "fechado"]:
+                        to = [agent, requester]
+                        notifier.send_concluded([t for t in to if t], ctx)
+                except Exception:
+                    pass
+            except Exception:
+                pass
             
             return ticket
             

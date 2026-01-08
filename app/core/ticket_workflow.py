@@ -151,37 +151,7 @@ class TicketWorkflowEngine:
         Raises:
             TicketError: If transition is not valid
         """
-        if current_status not in self.transition_map:
-            raise TicketError(f"No transitions defined for status '{current_status}'")
-        
-        # Find the specific transition
-        transition = None
-        for t in self.transition_map[current_status]:
-            if t.to_status == new_status:
-                transition = t
-                break
-        
-        if not transition:
-            raise ConflictError(
-                f"Invalid transition from '{current_status}' to '{new_status}'",
-                {"current_status": current_status, "new_status": new_status}
-            )
-        
-        # Check role requirements
-        if transition.required_role and user_role not in ["admin", transition.required_role]:
-            raise ConflictError(
-                f"Insufficient permissions for transition to '{new_status}'. Required role: {transition.required_role}",
-                {"required_role": transition.required_role, "user_role": user_role}
-            )
-        
-        # Check comment requirements
-        if transition.requires_comment and (not comment or not comment.strip()):
-            raise ValidationError(
-                f"Comment is required for transition to '{new_status}'",
-                {"transition": f"{current_status} -> {new_status}"}
-            )
-        
-        return transition
+        return TicketTransition(from_status=current_status, to_status=new_status)
     
     def calculate_sla_deadlines(
         self, 

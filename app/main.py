@@ -125,7 +125,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         AuthenticationMiddleware,
         protected_paths=["/admin", "/dashboard", "/kb"],
-        api_prefixes=["/api", "/admin/api", "/admin/helpdesk"],
+        api_prefixes=["/api", "/admin/api"],
     )
 
     # CORS
@@ -201,6 +201,10 @@ def create_app() -> FastAPI:
             status_code = int(getattr(exc, "status_code", 500) or 500)
         except Exception:
             status_code = 500
+        path = request.url.path
+        if status_code == 401 and not (path.startswith("/api") or path.startswith("/admin/api")):
+            from fastapi.responses import RedirectResponse as _RR
+            return _RR(url="/", status_code=302)
         if status_code >= 500:
             logging.getLogger(__name__).error(
                 "HTTP %s at %s %s: %s",
@@ -226,6 +230,31 @@ def create_app() -> FastAPI:
     async def startup_event():
         await initialize_database()
         await initialize_cache()
+        try:
+            from app.db.session import SessionLocal
+            from sqlalchemy import select
+            from app.db.models import StatusChamado
+            async with SessionLocal() as session:  # type: ignore
+                async def _exists(name: str) -> bool:
+                    res = await session.execute(select(StatusChamado).where(StatusChamado.nome.ilike(f"%{name}%")))
+                    return bool(res.scalars().first())
+                defaults = [
+                    ("Aberto", "", "#fff3e0", True),
+                    ("Em Atendimento", "", "#e8f5e8", True),
+                    ("Pendente Cliente", "", "#fff3cd", True),
+                    ("Incidente", "", "#ffebee", True),
+                    ("Concluído", "", "#d4edda", True),
+                    ("Atendimento pausado", "", "#e3f2fd", True),
+                ]
+                created = 0
+                for nome, descricao, cor, ativo in defaults:
+                    if not await _exists(nome):
+                        session.add(StatusChamado(nome=nome, descricao=descricao, cor=cor, ativo=ativo))
+                        created += 1
+                if created:
+                    await session.commit()
+        except Exception as exc:
+            logging.getLogger(__name__).warning(f"Status seed failed: {exc}")
 
     return app
 

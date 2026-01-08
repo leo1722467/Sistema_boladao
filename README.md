@@ -7,36 +7,43 @@ Backend service built with FastAPI, SQLAlchemy (async), Alembic, and JWT auth.
 - Poetry or pip
 
 ## Setup
-```powershell
+```cmd
 python -m venv .venv
-./.venv/Scripts/Activate.ps1
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Set environment variables (PowerShell):
-```powershell
-$env:APP_DB_URL = "sqlite+aiosqlite:///./app.db"
-$env:APP_JWT_SECRET = "change-me"
-$env:APP_APP_PORT = "8081"
+Set environment variables (Command Prompt):
+```cmd
+set APP_DB_URL=sqlite+aiosqlite:///./app.db
+set APP_JWT_SECRET=change-me
+set APP_APP_PORT=8081
 ```
 
 Run migrations:
-```powershell
+```cmd
 alembic upgrade head
 ```
 
 Seed dev user:
-```powershell
+```cmd
 python -m scripts.seed
 ```
 
 Run API:
-```powershell
+```cmd
 python -m app.main
 ```
 
-Authenticate using PowerShell:
-```powershell
-$login = Invoke-RestMethod -Method POST -Uri "http://localhost:8081/auth/login" -Body (@{ email = "admin@example.com"; password = "admin123" } | ConvertTo-Json) -ContentType "application/json"
-Invoke-RestMethod -Method GET -Uri "http://localhost:8081/auth/me" -Headers @{ Authorization = "Bearer $($login.access_token)" }
+Authenticate using Command Prompt (curl):
+```cmd
+curl -X POST ^
+  -H "Content-Type: application/json" ^
+  -d "{\"email\":\"admin@example.com\",\"password\":\"admin123\"}" ^
+  http://localhost:8081/auth/login
+
+rem Copy the access_token from the response above and use it here:
+curl -X GET ^
+  -H "Authorization: Bearer <ACCESS_TOKEN>" ^
+  http://localhost:8081/auth/me
 ```

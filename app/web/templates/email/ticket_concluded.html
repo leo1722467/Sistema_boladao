@@ -1,0 +1,9 @@
+<div style="font-family:Arial, sans-serif; color:#333;">
+  <h2>Chamado Concluído</h2>
+  <p><strong>Número:</strong> {{ numero }}</p>
+  <p><strong>Título:</strong> {{ titulo }}</p>
+  {% if comment %}
+  <p><strong>Resumo:</strong> {{ comment }}</p>
+  {% endif %}
+  <p><a href="http://localhost:8081/tickets" style="color:#1d4ed8;">Abrir lista de chamados</a></p>
+</div>

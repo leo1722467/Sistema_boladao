@@ -35,6 +35,7 @@
   .btn-success:hover { background: linear-gradient(135deg, #229954, #1e8449); }
   .btn i { margin-right: 8px; }
   .tickets-section { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden; }
+  .tickets-subsection { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden; margin-top: 20px; }
   .table-wrapper { overflow-x: auto; }
   .tickets-header { padding: 20px 25px; border-bottom: 1px solid #e9ecef; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; }
   .tickets-title { font-size: 18px; font-weight: 600; color: #2c3e50; }
@@ -43,6 +44,10 @@
   .tickets-table th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; color: #2c3e50; border-bottom: 1px solid #e9ecef; }
   .tickets-table td { padding: 15px; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
   .tickets-table tr:hover { background: #f8f9fa; }
+  .tickets-nav { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid #e9ecef; margin-bottom: 16px; }
+  .tickets-nav .nav-item { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 20px; border: 1px solid #e0e0e0; background: #fff; color: #2c3e50; cursor: pointer; font-size: 14px; }
+  .tickets-nav .nav-item.active { background: #3498db; color: #fff; border-color: #3498db; }
+  .tickets-nav .nav-item i { margin-right: 8px; }
   .ticket-number { font-weight: 600; color: #3498db; text-decoration: none; }
   .ticket-number:hover { text-decoration: underline; }
   .ticket-status { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
@@ -81,7 +86,13 @@
 </style>
 {% endblock %}
 {% block topbar_left %}
-<h1 class="page-title">Gestão de Chamados</h1>
+<div>
+  <h1 class="page-title">Gestão de Chamados</h1>
+  <div class="tickets-nav" style="margin-top:8px;">
+    <button id="navAll" class="nav-item active"><i class="fas fa-layer-group"></i>Todos</button>
+    <a id="navAdminHelpdesk" class="nav-item" href="/admin/helpdesk"><i class="fas fa-tools"></i>Admin Helpdesk</a>
+  </div>
+</div>
 {% endblock %}
 {% block content %}
   <div class="container">
@@ -128,82 +139,86 @@
         </div>
       </div>
 
-      <!-- Filters Section -->
-      <div class="filters-section">
-        <div class="filters-header">
-          <h3 class="filters-title">Filtros e Pesquisa</h3>
-          <button class="btn btn-success" id="addTicketBtn">
-            <i class="fas fa-plus"></i>
-            Novo Chamado
-          </button>
-        </div>
-        
-        <div class="filters-grid">
-          <div class="filter-group">
-            <label class="filter-label">Pesquisar</label>
-            <input type="text" class="filter-input" id="searchInput" placeholder="Número, título, descrição...">
-          </div>
-          
-          <div class="filter-group">
-            <label class="filter-label">Status</label>
-            <select class="filter-select" id="statusFilter">
-              <option value="">Todos os status</option>
-              <option value="new">Novo</option>
-              <option value="open">Aberto</option>
-              <option value="in_progress">Em Andamento</option>
-              <option value="pending_customer">Aguardando Cliente</option>
-              <option value="resolved">Resolvido</option>
-              <option value="closed">Fechado</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label class="filter-label">Prioridade</label>
-            <select class="filter-select" id="priorityFilter">
-              <option value="">Todas as prioridades</option>
-              <option value="low">Baixa</option>
-              <option value="normal">Normal</option>
-              <option value="high">Alta</option>
-              <option value="urgent">Urgente</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label class="filter-label">Agente</label>
-            <select class="filter-select" id="agentFilter">
-              <option value="">Todos os agentes</option>
-              <option value="unassigned">Não atribuído</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label class="filter-label">SLA</label>
-            <select class="filter-select" id="slaFilter">
-              <option value="">Todos</option>
-              <option value="ok">No prazo</option>
-              <option value="warning">Em risco</option>
-              <option value="breach">Vencido</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="filter-actions">
-          <button class="btn btn-primary" id="applyFiltersBtn">
-            <i class="fas fa-search"></i>
-            Aplicar Filtros
-          </button>
-          <button class="btn btn-secondary" id="clearFiltersBtn">
-            <i class="fas fa-times"></i>
-            Limpar
-          </button>
-        </div>
-      </div>
+      
 
       <!-- Tickets Section -->
       <div class="tickets-section">
         <div class="tickets-header">
           <h3 class="tickets-title">Lista de Chamados</h3>
           <span class="tickets-count" id="ticketsCount">Carregando...</span>
+        </div>
+        <div class="filters-section">
+          <div class="filters-header">
+            <h3 class="filters-title">Filtros e Pesquisa</h3>
+            <button class="btn btn-success" id="addTicketBtn">
+              <i class="fas fa-plus"></i>
+              Novo Chamado
+            </button>
+          </div>
+          
+          <div class="filters-grid">
+            <div class="filter-group">
+              <label class="filter-label">Pesquisar</label>
+              <input type="text" class="filter-input" id="searchInput" placeholder="Número, título, descrição...">
+            </div>
+            
+            <div class="filter-group">
+              <label class="filter-label">Status</label>
+              <select class="filter-select" id="statusFilter">
+                <option value="">Todos os status</option>
+                <option value="new">Novo</option>
+                <option value="open">Aberto</option>
+                <option value="in_progress">Em Andamento</option>
+                <option value="pending_customer">Aguardando Cliente</option>
+                <option value="resolved">Resolvido</option>
+                <option value="closed">Fechado</option>
+              </select>
+            </div>
+            
+            <div class="filter-group">
+              <label class="filter-label">Prioridade</label>
+              <select class="filter-select" id="priorityFilter">
+                <option value="">Todas as prioridades</option>
+                <option value="low">Baixa</option>
+                <option value="normal">Normal</option>
+                <option value="high">Alta</option>
+                <option value="urgent">Urgente</option>
+              </select>
+            </div>
+            
+            <div class="filter-group">
+              <label class="filter-label">Agente</label>
+              <select class="filter-select" id="agentFilter">
+                <option value="">Todos os agentes</option>
+                <option value="unassigned">Não atribuído</option>
+              </select>
+            </div>
+            
+            <div class="filter-group">
+              <label class="filter-label">SLA</label>
+              <select class="filter-select" id="slaFilter">
+                <option value="">Todos</option>
+                <option value="ok">No prazo</option>
+                <option value="warning">Em risco</option>
+                <option value="breach">Vencido</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="filter-actions">
+            <button class="btn btn-primary" id="applyFiltersBtn">
+              <i class="fas fa-search"></i>
+              Aplicar Filtros
+            </button>
+            <button class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="fas fa-times"></i>
+              Limpar
+            </button>
+          </div>
+        </div>
+        <div class="tickets-nav">
+          <button id="navActive" class="nav-item"><i class="fas fa-folder-open"></i>Abertos</button>
+          <button id="navClosed" class="nav-item"><i class="fas fa-archive"></i>Fechados</button>
         </div>
         
         <div id="ticketsTableContainer">
@@ -255,6 +270,7 @@
     let totalPages = 1;
     let currentTickets = [];
     let ticketStats = {};
+    let ticketsView = 'all';
 
     document.addEventListener('DOMContentLoaded', function() {
       const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='));
@@ -271,20 +287,40 @@
       document.getElementById('searchInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') applyFilters();
       });
-      
+
       // Modal events
       document.getElementById('addTicketBtn').addEventListener('click', openAddModal);
       document.getElementById('modalClose').addEventListener('click', closeModal);
       document.getElementById('workflowModalClose').addEventListener('click', closeWorkflowModal);
-      
+
       // Close modals on outside click
       document.getElementById('ticketModal').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
       });
-      
+
       document.getElementById('workflowModal').addEventListener('click', function(e) {
         if (e.target === this) closeWorkflowModal();
       });
+
+      // Tickets top nav
+      document.getElementById('navAll').addEventListener('click', () => setTicketsView('all'));
+      document.getElementById('navActive').addEventListener('click', () => setTicketsView('active'));
+      document.getElementById('navClosed').addEventListener('click', () => setTicketsView('closed'));
+    }
+
+    function setTicketsView(view) {
+      ticketsView = view;
+      const ids = ['navAll', 'navActive', 'navClosed'];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if ((id === 'navAll' && view === 'all') || (id === 'navActive' && view === 'active') || (id === 'navClosed' && view === 'closed')) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
+      });
+      renderTicketsTable();
     }
 
     async function loadUserGreeting() {
@@ -423,85 +459,132 @@
         return;
       }
       
-      const tableHTML = `
-        <div class="table-wrapper">
-        <table class="tickets-table">
-          <thead>
-            <tr>
-              <th>Número</th>
-              <th>Título</th>
-              <th>Status</th>
-              <th>Prioridade</th>
-              <th>Agente</th>
-              <th>SLA</th>
-              <th>Criado</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${currentTickets.map(ticket => `
-              <tr>
-                <td>
-                  <a href="#" class="ticket-number" onclick="viewTicket(${ticket.id})">
-                    ${ticket.numero}
-                  </a>
-                </td>
-                <td>
-                  <strong>${ticket.titulo}</strong>
-                  ${ticket.descricao ? `<br><small style="color: #666;">${ticket.descricao.substring(0, 50)}...</small>` : ''}
-                </td>
-                <td>
-                  <span class="ticket-status ${getStatusClass(ticket.status)}">
-                    ${getStatusLabel(ticket.status)}
-                  </span>
-                </td>
-                <td>
-                  <span class="priority-badge ${getPriorityClass(ticket.priority)}">
-                    ${getPriorityLabel(ticket.priority)}
-                  </span>
-                </td>
-                <td>${ticket.agente?.nome || 'Não atribuído'}</td>
-                <td>
-                  <div class="sla-indicator ${getSlaClass(ticket.sla_status)}">
-                    <i class="fas ${getSlaIcon(ticket.sla_status)}"></i>
-                    ${getSlaLabel(ticket.sla_status)}
-                  </div>
-                </td>
-                <td>${formatDate(ticket.criado_em)}</td>
-                <td>
-                  <div class="ticket-actions">
-                    <button class="action-btn view" onclick="viewTicket(${ticket.id})" title="Visualizar">
-                      <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="action-btn edit" onclick="editTicket(${ticket.id})" title="Editar">
-                      <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="action-btn workflow" onclick="showWorkflow(${ticket.id})" title="Workflow">
-                      <i class="fas fa-project-diagram"></i>
-                    </button>
-                    <button class="action-btn" style="background:#e3ffe3;color:#2e7d32" onclick="assignToMe(${ticket.id})" title="Atribuir para mim">
-                      <i class="fas fa-user-check"></i>
-                    </button>
-                    <button class="action-btn" style="background:#e3f2fd;color:#1976d2" onclick="changeStatus(${ticket.id}, 'in_progress')" title="Mover para Em Andamento">
-                      <i class="fas fa-play"></i>
-                    </button>
-                    <button class="action-btn" style="background:#fff3e0;color:#f57c00" onclick="changeStatus(${ticket.id}, 'pending_customer')" title="Aguardando Cliente">
-                      <i class="fas fa-user-clock"></i>
-                    </button>
-                    <button class="action-btn" style="background:#d4edda;color:#155724" onclick="resolveTicket(${ticket.id})" title="Resolver">
-                      <i class="fas fa-check"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+      const openTickets = currentTickets.filter(t => t.status !== 'closed');
+      const closedTickets = currentTickets.filter(t => t.status === 'closed');
+
+      const renderRows = (list) => list.map(ticket => `
+        <tr>
+          <td>
+            <a href="#" class="ticket-number" onclick="viewTicket(${ticket.id})">
+              ${ticket.numero}
+            </a>
+          </td>
+          <td>
+            <strong>${ticket.titulo}</strong>
+            ${ticket.descricao ? `<br><small style="color: #666;">${ticket.descricao.substring(0, 50)}...</small>` : ''}
+          </td>
+          <td>
+            <span class="ticket-status ${getStatusClass(ticket.status)}">
+              ${getStatusLabel(ticket.status)}
+            </span>
+          </td>
+          <td>
+            <span class="priority-badge ${getPriorityClass(ticket.priority)}">
+              ${getPriorityLabel(ticket.priority)}
+            </span>
+          </td>
+          <td>${ticket.agente?.nome || 'Não atribuído'}</td>
+          <td>
+            <div class="sla-indicator ${getSlaClass(ticket.sla_status)}">
+              <i class="fas ${getSlaIcon(ticket.sla_status)}"></i>
+              ${getSlaLabel(ticket.sla_status)}
+            </div>
+          </td>
+          <td>${formatDate(ticket.criado_em)}</td>
+          <td>
+            <div class="ticket-actions">
+              <button class="action-btn view" onclick="viewTicket(${ticket.id})" title="Visualizar">
+                <i class="fas fa-eye"></i>
+              </button>
+              <button class="action-btn edit" onclick="editTicket(${ticket.id})" title="Editar">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="action-btn workflow" onclick="showWorkflow(${ticket.id})" title="Workflow">
+                <i class="fas fa-project-diagram"></i>
+              </button>
+              <button class="action-btn" style="background:#e3ffe3;color:#2e7d32" onclick="assignToMe(${ticket.id})" title="Atribuir para mim">
+                <i class="fas fa-user-check"></i>
+              </button>
+              <button class="action-btn" style="background:#e3f2fd;color:#1976d2" onclick="changeStatus(${ticket.id}, 'in_progress')" title="Mover para Em Andamento">
+                <i class="fas fa-play"></i>
+              </button>
+              <button class="action-btn" style="background:#fff3e0;color:#f57c00" onclick="changeStatus(${ticket.id}, 'pending_customer')" title="Aguardando Cliente">
+                <i class="fas fa-user-clock"></i>
+              </button>
+              <button class="action-btn" style="background:#d4edda;color:#155724" onclick="resolveTicket(event, ${ticket.id})" title="Resolver">
+                <i class="fas fa-check"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      const openSection = `
+        <div class="tickets-subsection">
+          <div class="tickets-header">
+            <h3 class="tickets-title">Chamados Abertos</h3>
+            <span class="tickets-count">${openTickets.length}</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="tickets-table">
+              <thead>
+                <tr>
+                  <th>Número</th>
+                  <th>Título</th>
+                  <th>Status</th>
+                  <th>Prioridade</th>
+                  <th>Agente</th>
+                  <th>SLA</th>
+                  <th>Criado</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${renderRows(openTickets)}
+              </tbody>
+            </table>
+          </div>
         </div>
-        ${renderPagination()}
       `;
-      
-      container.innerHTML = tableHTML;
+
+      const closedSection = `
+        <div class="tickets-subsection">
+          <div class="tickets-header">
+            <h3 class="tickets-title">Chamados Fechados</h3>
+            <span class="tickets-count">${closedTickets.length}</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="tickets-table">
+              <thead>
+                <tr>
+                  <th>Número</th>
+                  <th>Título</th>
+                  <th>Status</th>
+                  <th>Prioridade</th>
+                  <th>Agente</th>
+                  <th>SLA</th>
+                  <th>Criado</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${renderRows(closedTickets)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      let html = '';
+      if (ticketsView === 'active') {
+        html = `${openSection}${renderPagination()}`;
+      } else if (ticketsView === 'closed') {
+        html = `${closedSection}${renderPagination()}`;
+      } else {
+        html = `${openSection}${closedTickets.length ? closedSection : ''}${renderPagination()}`;
+      }
+
+      container.innerHTML = html;
     }
 
     function getStatusClass(status) {
@@ -893,6 +976,31 @@
       if (!r.ok) throw new Error('Falha ao carregar usuário');
       return await r.json();
     }
+    function _normStatusName(s) {
+      const n = String(s || '').trim().toLowerCase();
+      const map = {
+        'novo': 'new', 'new': 'new',
+        'aberto': 'open', 'open': 'open',
+        'em andamento': 'in_progress', 'em atendimento': 'in_progress', 'in_progress': 'in_progress',
+        'aguardando cliente': 'pending_customer', 'em espera': 'pending_customer', 'espera': 'pending_customer', 'pending_customer': 'pending_customer',
+        'resolvido': 'resolved', 'resolved': 'resolved',
+        'fechado': 'closed', 'closed': 'closed'
+      };
+      return map[n] || n;
+    }
+    async function getStatusId(code) {
+      try {
+        if (!window.__statusOptions) {
+          const headers = await apiHeaders();
+          const res = await fetch('/admin/Chamado/foreign-key-options/status_id', { credentials: 'include', headers });
+          if (!res.ok) return null;
+          window.__statusOptions = await res.json();
+        }
+        const target = String(code || '').toLowerCase();
+        const found = (window.__statusOptions || []).find(o => _normStatusName(o.display || o.nome || o.label) === target);
+        return found ? Number(found.id) : null;
+      } catch { return null; }
+    }
 
     async function assignToMe(id) {
       try {
@@ -960,21 +1068,59 @@
       } catch (e) { alert(e.message || 'Erro ao alterar status'); }
     }
 
-    async function resolveTicket(id) {
-      const comment = prompt('Adicionar comentário de resolução (obrigatório):') || '';
-      if (!comment.trim()) { alert('Comentário é obrigatório para resolver chamado'); return; }
-      try {
-        const headers = await apiHeaders();
-        const r = await fetch(`/api/helpdesk/tickets/${id}`, {
-          method: 'PUT', credentials: 'include', headers, body: JSON.stringify({ status: 'resolved', comment })
-        });
-        if (!r.ok) {
-          let msg = 'Falha ao resolver chamado';
-          try { const err = await r.json(); if (typeof err?.detail?.message === 'string') msg = err.detail.message; else if (typeof err?.detail === 'string') msg = err.detail; } catch {}
-          throw new Error(msg);
+    function resolveTicket(e, id) {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      const btn = e && e.currentTarget ? e.currentTarget : null;
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
+      setTimeout(async () => {
+        try {
+          const hasToken = document.cookie.split('; ').some(row => row.startsWith('access_token='));
+          if (!hasToken) { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; } window.location.href = '/'; return; }
+          const comment = prompt('Adicionar comentário de resolução (obrigatório):') || '';
+          if (!comment.trim()) { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; } alert('Comentário é obrigatório para resolver chamado'); return; }
+          const headers = await apiHeaders();
+          let currentStatus = '';
+          try {
+            const rcur = await fetch(`/api/helpdesk/tickets/${id}`, { credentials: 'include', headers });
+            if (rcur.status === 401) { window.location.href = '/'; return; }
+            if (rcur.ok) {
+              const td = await rcur.json();
+              currentStatus = String(td.status || '').toLowerCase();
+            }
+          } catch {}
+          if (!currentStatus) {
+            const t = currentTickets.find(x => x.id === id);
+            currentStatus = t ? String(t.status || '').toLowerCase() : '';
+          }
+          if (currentStatus === 'new') {
+            const openId = await getStatusId('open');
+            const bodyOpen = openId ? { status_id: openId } : { status: 'open' };
+            const r1 = await fetch(`/api/helpdesk/tickets/${id}`, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(bodyOpen) });
+            if (r1.status === 401) { window.location.href = '/'; return; }
+            if (!r1.ok) {
+              let m1 = 'Falha ao alterar status para Aberto';
+              try { const e1 = await r1.json(); if (typeof e1?.detail?.message === 'string') m1 = e1.detail.message; else if (typeof e1?.detail === 'string') m1 = e1.detail; } catch {}
+              throw new Error(m1);
+            }
+          }
+          const resolvedId = await getStatusId('resolved');
+          const bodyResolved = resolvedId ? { status_id: resolvedId, comment } : { status: 'resolved', comment };
+          const r2 = await fetch(`/api/helpdesk/tickets/${id}`, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(bodyResolved) });
+          if (r2.status === 401) { window.location.href = '/'; return; }
+          if (!r2.ok) { let msg = 'Falha ao resolver chamado'; try { const err = await r2.json(); if (typeof err?.detail?.message === 'string') msg = err.detail.message; else if (typeof err?.detail === 'string') msg = err.detail; } catch {} throw new Error(msg); }
+          const closedId = await getStatusId('closed');
+          const bodyClosed = closedId ? { status_id: closedId } : { status: 'closed' };
+          const r3 = await fetch(`/api/helpdesk/tickets/${id}`, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(bodyClosed) });
+          if (r3.status === 401) { window.location.href = '/'; return; }
+          if (!r3.ok) { let msg = 'Falha ao fechar chamado'; try { const err = await r3.json(); if (typeof err?.detail?.message === 'string') msg = err.detail.message; else if (typeof err?.detail === 'string') msg = err.detail; } catch {} throw new Error(msg); }
+          await loadTickets(currentPage);
+        } catch (err) {
+          alert(err.message || 'Erro ao resolver chamado');
+        } finally {
+          if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
         }
-        await loadTickets(currentPage);
-      } catch (e) { alert(e.message || 'Erro ao resolver chamado'); }
+      }, 0);
     }
   </script>
 {% endblock %}

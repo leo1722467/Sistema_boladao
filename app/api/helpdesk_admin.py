@@ -11,6 +11,7 @@ from app.db.models import (
     StatusChamado,
     Chamado,
 )
+from app.core.helpdesk_config import load_notifications_config, save_notifications_config
 
 router = APIRouter(prefix="/admin/helpdesk", tags=["admin"])
 
@@ -118,7 +119,34 @@ async def put_sla_overrides(payload: dict, auth: AuthorizationContext = Depends(
         )
         session.add(ov)
     await session.commit()
+    try:
+        from app.services.notification_email import EmailNotifier
+        from app.core.config import get_settings
+        notifier = EmailNotifier()
+        team = get_settings().NOTIFY_SLA_TEAM_EMAILS
+        notifier.send_sla_overrides_updated(team, {"empresa_id": empresa_id})
+    except Exception:
+        pass
     return {"ok": True}
+
+@router.get("/notifications")
+async def get_notifications_config(_: AuthorizationContext = Depends(get_authorization_context)):
+    return load_notifications_config()
+
+@router.put("/notifications")
+async def put_notifications_config(payload: dict, _: AuthorizationContext = Depends(get_authorization_context)):
+    cfg = load_notifications_config()
+    # Merge incoming payload with existing config
+    def merge(a, b):
+        for k, v in b.items():
+            if isinstance(v, dict) and isinstance(a.get(k), dict):
+                merge(a[k], v)
+            else:
+                a[k] = v
+        return a
+    cfg = merge(cfg, payload or {})
+    save_notifications_config(cfg)
+    return {"ok": True, "config": cfg}
 
 @router.get("/auto-close")
 async def get_auto_close_policy(auth: AuthorizationContext = Depends(get_authorization_context), session: AsyncSession = Depends(get_db)):

@@ -45,3 +45,36 @@ def load_auto_close_policy() -> Dict[str, Any]:
 def save_auto_close_policy(data: Dict[str, Any]) -> None:
     _save_json("auto_close_policy", data)
 
+def load_notifications_config() -> Dict[str, Any]:
+    return _load_json("notifications", {
+        "enabled": False,
+        "smtp": {
+            "host": None,
+            "port": None,
+            "use_tls": True,
+            "use_ssl": False,
+            "user": None,
+            "password": None,
+            "from_email": None,
+            "from_name": "Sistema Boladão",
+        },
+        "events": {
+            "on_create": True,
+            "on_status": True,
+            "on_assign": True,
+            "on_pending_customer": True,
+            "on_concluded": True
+        },
+        "sla": {
+            "enabled": True,
+            "on_response_breach": True,
+            "on_resolution_breach": True,
+            "on_escalation": True,
+            "on_overrides_updated": True,
+            "team_contact_ids": [],
+            "company_rules": []  # [{ "empresa_id": 1, "contact_ids": [10, 12] }]
+        }
+    })
+
+def save_notifications_config(data: Dict[str, Any]) -> None:
+    _save_json("notifications", data)

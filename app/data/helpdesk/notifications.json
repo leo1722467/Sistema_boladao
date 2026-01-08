@@ -1,0 +1,38 @@
+{
+  "enabled": false,
+  "smtp": {
+    "host": null,
+    "port": null,
+    "use_tls": true,
+    "use_ssl": false,
+    "user": null,
+    "password": null,
+    "from_email": null,
+    "from_name": "Sistema Boladão"
+  },
+  "events": {
+    "on_create": true,
+    "on_status": true,
+    "on_assign": true,
+    "on_pending_customer": true,
+    "on_concluded": true
+  },
+  "sla": {
+    "enabled": true,
+    "on_response_breach": true,
+    "on_resolution_breach": true,
+    "on_escalation": true,
+    "on_overrides_updated": true,
+    "team_contact_ids": [
+      2
+    ],
+    "company_rules": [
+      {
+        "empresa_id": 1,
+        "contact_ids": [
+          2
+        ]
+      }
+    ]
+  }
+}

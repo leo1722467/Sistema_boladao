@@ -51,13 +51,13 @@
         <i class="fas fa-database"></i>
         Admin
       </a>
-      <a href="/admin/helpdesk" class="nav-item {% if request.url.path.startswith('/admin/helpdesk') %}active{% endif %}">
-        <i class="fas fa-headset"></i>
-        Admin Helpdesk
-      </a>
       <a href="/admin/kb" class="nav-item {% if request.url.path.startswith('/admin/kb') %}active{% endif %}">
         <i class="fas fa-book"></i>
         Admin KB
+      </a>
+      <a href="/admin/notifications" class="nav-item {% if request.url.path.startswith('/admin/notifications') %}active{% endif %}">
+        <i class="fas fa-envelope"></i>
+        Notificações SMTP
       </a>
     </nav>
   </div>

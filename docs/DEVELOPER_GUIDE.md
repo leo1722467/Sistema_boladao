@@ -11,6 +11,30 @@ This guide explains how the project is structured and how to add new pages, rout
 - Static assets: `app/web/static/` mounted to `/static`.
 - Auth: Login sets cookie `access_token`; middleware gates protected paths and API calls.
 
+## Windows Shell Conventions (Command Prompt)
+- Use Command Prompt (`cmd`) instead of PowerShell for Windows examples.
+- Activate venv:
+  ```cmd
+  .\.venv\Scripts\activate
+  ```
+- Set environment variables:
+  ```cmd
+  set APP_DB_URL=sqlite+aiosqlite:///./app.db
+  set APP_JWT_SECRET=change-me
+  set APP_APP_PORT=8081
+  ```
+- Run migrations:
+  ```cmd
+  alembic upgrade head
+  ```
+- Call APIs using `curl`:
+  ```cmd
+  curl -X POST ^
+    -H "Content-Type: application/json" ^
+    -d "{\"email\":\"admin@example.com\",\"password\":\"admin123\"}" ^
+    http://localhost:8081/auth/login
+  ```
+
 ## App Startup and Middleware
 - `app/main.py` adds middlewares:
   - `RequestIDMiddleware` and `SecurityHeadersMiddleware` for traceability and security headers.

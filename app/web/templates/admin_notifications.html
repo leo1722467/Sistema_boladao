@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+{% set sidebar_subtitle = 'Admin Notificações' %}
+{% block title %}Notificações SMTP - Sistema Boladão{% endblock %}
+{% block extra_head %}
+<style>
+  .container { padding:30px; max-width:1000px; }
+  .card { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e9ecef; margin-bottom:20px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+  .form-group { flex:1; min-width:240px; }
+  .label { display:block; font-size:13px; color:#666; margin-bottom:6px; }
+  .input, .select, .textarea { width:100%; padding:10px; border:1px solid #e9ecef; border-radius:8px; font-size:14px; }
+  .textarea { min-height:100px; }
+  .actions { display:flex; gap:10px; margin-top:10px; }
+  .btn { display:inline-flex; align-items:center; padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:500; text-decoration:none; cursor:pointer; transition:all .3s ease; }
+  .btn-primary { background:linear-gradient(135deg,#3498db,#2980b9); color:white; }
+  .btn-primary:hover { background:linear-gradient(135deg,#2980b9,#21618c); transform:translateY(-1px); }
+  .btn i { margin-right:8px; }
+  .success { color:#27ae60; margin-top:10px; }
+  .danger { color:#e74c3c; margin-top:10px; }
+</style>
+{% endblock %}
+{% block topbar_left %}
+<h1 class="page-title">Configuração de Notificações SMTP</h1>
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <h3>Geral</h3>
+    <div class="row">
+      <div class="form-group">
+        <label class="label">Ativar Notificações</label>
+        <select id="enabled" class="select"><option value="true">Sim</option><option value="false">Não</option></select>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>SMTP</h3>
+    <div class="row">
+      <div class="form-group"><label class="label">Host</label><input id="smtp_host" class="input" /></div>
+      <div class="form-group"><label class="label">Porta</label><input id="smtp_port" class="input" type="number" /></div>
+      <div class="form-group"><label class="label">TLS</label><select id="smtp_tls" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">SSL</label><select id="smtp_ssl" class="select"><option value="false">Não</option><option value="true">Sim</option></select></div>
+      <div class="form-group"><label class="label">Usuário</label><input id="smtp_user" class="input" /></div>
+      <div class="form-group"><label class="label">Senha</label><input id="smtp_password" class="input" type="password" /></div>
+      <div class="form-group"><label class="label">Remetente (Email)</label><input id="smtp_from_email" class="input" /></div>
+      <div class="form-group"><label class="label">Remetente (Nome)</label><input id="smtp_from_name" class="input" /></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Eventos</h3>
+    <div class="row">
+      <div class="form-group"><label class="label">Ao criar chamado</label><select id="on_create" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Ao alterar status</label><select id="on_status" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Ao atribuir agente</label><select id="on_assign" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Aguardando Cliente</label><select id="on_pending_customer" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Concluído</label><select id="on_concluded" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Alertas de SLA</h3>
+    <div class="row">
+      <div class="form-group"><label class="label">Ativar SLA</label><select id="sla_enabled" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Falha de Resposta</label><select id="sla_resp" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Falha de Resolução</label><select id="sla_res" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group"><label class="label">Escalonamento Necessário</label><select id="sla_esc" class="select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+      <div class="form-group" style="flex:1 1 100%;">
+        <label class="label">Selecionar contatos da equipe</label>
+        <div style="position:relative;">
+          <input id="teamSearchInput" class="input" placeholder="Buscar contato por nome/email" />
+          <div id="teamSuggestBox" style="position:absolute;left:0;right:0;top:44px;background:#fff;border:1px solid #e9ecef;border-radius:8px;display:none;max-height:240px;overflow:auto;z-index:10;"></div>
+        </div>
+        <div id="teamChips" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group" style="flex:1 1 100%;">
+        <label class="label">Regras por Empresa</label>
+        <div id="companyRulesBox"></div>
+        <button id="addCompanyRuleBtn" class="btn"><i class="fas fa-plus"></i> Adicionar Regra</button>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="saveBtn" class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
+    <div id="statusBox" class="success"></div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  async function apiHeaders() {
+    const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  }
+  async function loadConfig() {
+    const headers = await apiHeaders();
+    const res = await fetch('/admin/helpdesk/notifications', { credentials:'include', headers });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    document.getElementById('enabled').value = String(!!cfg.enabled);
+    document.getElementById('smtp_host').value = cfg.smtp?.host || '';
+    document.getElementById('smtp_port').value = cfg.smtp?.port || '';
+    document.getElementById('smtp_tls').value = String(!!cfg.smtp?.use_tls);
+    document.getElementById('smtp_ssl').value = String(!!cfg.smtp?.use_ssl);
+    document.getElementById('smtp_user').value = cfg.smtp?.user || '';
+    document.getElementById('smtp_password').value = cfg.smtp?.password || '';
+    document.getElementById('smtp_from_email').value = cfg.smtp?.from_email || '';
+    document.getElementById('smtp_from_name').value = cfg.smtp?.from_name || '';
+    document.getElementById('on_create').value = String(!!cfg.events?.on_create);
+    document.getElementById('on_status').value = String(!!cfg.events?.on_status);
+    document.getElementById('on_assign').value = String(!!cfg.events?.on_assign);
+    document.getElementById('on_pending_customer').value = String(!!cfg.events?.on_pending_customer);
+    document.getElementById('on_concluded').value = String(!!cfg.events?.on_concluded);
+    document.getElementById('sla_enabled').value = String(!!cfg.sla?.enabled);
+    document.getElementById('sla_resp').value = String(!!cfg.sla?.on_response_breach);
+    document.getElementById('sla_res').value = String(!!cfg.sla?.on_resolution_breach);
+    document.getElementById('sla_esc').value = String(!!cfg.sla?.on_escalation);
+    window.__contacts = await loadContacts();
+    window.__companies = await loadCompanies();
+    window.__teamContactIds = Array.isArray(cfg.sla?.team_contact_ids) ? cfg.sla.team_contact_ids.slice() : [];
+    window.__companyRules = Array.isArray(cfg.sla?.company_rules) ? cfg.sla.company_rules.slice() : [];
+    renderTeamChips();
+    renderCompanyRules();
+  }
+  async function saveConfig() {
+    const headers = await apiHeaders();
+    const payload = {
+      enabled: document.getElementById('enabled').value === 'true',
+      smtp: {
+        host: document.getElementById('smtp_host').value || null,
+        port: parseInt(document.getElementById('smtp_port').value || '0') || null,
+        use_tls: document.getElementById('smtp_tls').value === 'true',
+        use_ssl: document.getElementById('smtp_ssl').value === 'true',
+        user: document.getElementById('smtp_user').value || null,
+        password: document.getElementById('smtp_password').value || null,
+        from_email: document.getElementById('smtp_from_email').value || null,
+        from_name: document.getElementById('smtp_from_name').value || null,
+      },
+      events: {
+        on_create: document.getElementById('on_create').value === 'true',
+        on_status: document.getElementById('on_status').value === 'true',
+        on_assign: document.getElementById('on_assign').value === 'true',
+        on_pending_customer: document.getElementById('on_pending_customer').value === 'true',
+        on_concluded: document.getElementById('on_concluded').value === 'true',
+      },
+      sla: {
+        enabled: document.getElementById('sla_enabled').value === 'true',
+        on_response_breach: document.getElementById('sla_resp').value === 'true',
+        on_resolution_breach: document.getElementById('sla_res').value === 'true',
+        on_escalation: document.getElementById('sla_esc').value === 'true',
+        on_overrides_updated: true,
+        team_contact_ids: (window.__teamContactIds || []).slice(),
+        company_rules: (window.__companyRules || []).map(r => ({ empresa_id: Number(r.empresa_id), contact_ids: (r.contact_ids || []).map(Number) })),
+      }
+    };
+    const res = await fetch('/admin/helpdesk/notifications', { method:'PUT', credentials:'include', headers, body: JSON.stringify(payload) });
+    if (!res.ok) { document.getElementById('statusBox').textContent = 'Falha ao salvar'; document.getElementById('statusBox').className='danger'; return; }
+    document.getElementById('statusBox').textContent = 'Configurações salvas';
+    document.getElementById('statusBox').className='success';
+  }
+  async function loadContacts() {
+    const headers = await apiHeaders();
+    const r = await fetch('/admin/Contato/items', { credentials:'include', headers });
+    if (!r.ok) return [];
+    return await r.json();
+  }
+  async function loadCompanies() {
+    const headers = await apiHeaders();
+    const r = await fetch('/admin/Empresa/items', { credentials:'include', headers });
+    if (!r.ok) return [];
+    return await r.json();
+  }
+  function renderTeamChips() {
+    const box = document.getElementById('teamChips');
+    const ids = window.__teamContactIds || [];
+    const contacts = window.__contacts || [];
+    box.innerHTML = ids.map(id => {
+      const c = contacts.find(x => x.id === id);
+      const label = c ? `${c.nome || 'Contato'} (${c.email || '-'})` : `Contato #${id}`;
+      return `<span class="chip" style="display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:16px;background:#e3f2fd;color:#1976d2;"><span>${label}</span><button class="btn" style="background:none;color:#1976d2;padding:0 6px;" onclick="removeTeamContact(${id})"><i class="fas fa-times"></i></button></span>`;
+    }).join('');
+  }
+  window.removeTeamContact = function(id) {
+    window.__teamContactIds = (window.__teamContactIds || []).filter(x => x !== id);
+    renderTeamChips();
+  }
+  function renderTeamSuggest(q) {
+    const box = document.getElementById('teamSuggestBox');
+    const ql = (q || '').trim().toLowerCase();
+    if (!ql) { box.style.display='none'; box.innerHTML=''; return; }
+    const contacts = (window.__contacts || []).filter(c => (String(c.nome||'').toLowerCase().includes(ql) || String(c.email||'').toLowerCase().includes(ql)));
+    box.innerHTML = contacts.slice(0, 10).map(c => `<div class="asset-suggest-item" style="padding:10px;border-bottom:1px solid #e9ecef;cursor:pointer;" onclick="addTeamContact(${c.id})">${c.nome || 'Contato'} · ${c.email || '-'}</div>`).join('');
+    box.style.display = contacts.length ? 'block' : 'none';
+  }
+  window.addTeamContact = function(id) {
+    if (!window.__teamContactIds.includes(id)) window.__teamContactIds.push(id);
+    document.getElementById('teamSuggestBox').style.display='none';
+    document.getElementById('teamSearchInput').value='';
+    renderTeamChips();
+  }
+  function renderCompanyRules() {
+    const box = document.getElementById('companyRulesBox');
+    const rules = window.__companyRules || [];
+    const companies = window.__companies || [];
+    const contacts = window.__contacts || [];
+    box.innerHTML = rules.map((r, idx) => {
+      const compOpts = companies.map(c => `<option value="${c.id}" ${String(r.empresa_id)===String(c.id)?'selected':''}>${c.nome || 'Empresa'} #${c.id}</option>`).join('');
+      const chips = (r.contact_ids || []).map(id => {
+        const c = contacts.find(x => x.id === id);
+        const label = c ? `${c.nome || 'Contato'} (${c.email || '-'})` : `Contato #${id}`;
+        return `<span class="chip" style="display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:16px;background:#e8f5e8;color:#2e7d32;"><span>${label}</span><button class="btn" style="background:none;color:#2e7d32;padding:0 6px;" onclick="removeRuleContact(${idx},${id})"><i class="fas fa-times"></i></button></span>`;
+      }).join('');
+      return `
+        <div class="card" style="margin-top:10px;">
+          <div class="row">
+            <div class="form-group" style="flex:1;"><label class="label">Empresa</label><select class="select" onchange="setRuleCompany(${idx}, this.value)">${compOpts}</select></div>
+            <div class="form-group" style="flex:2;">
+              <label class="label">Adicionar contatos</label>
+              <div style="position:relative;">
+                <input class="input" id="ruleSearchInput_${idx}" placeholder="Buscar contato" oninput="ruleSuggest(${idx}, this.value)" />
+                <div id="ruleSuggestBox_${idx}" style="position:absolute;left:0;right:0;top:44px;background:#fff;border:1px solid #e9ecef;border-radius:8px;display:none;max-height:240px;overflow:auto;z-index:10;"></div>
+              </div>
+              <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${chips}</div>
+            </div>
+            <div class="form-group" style="flex:0;">
+              <button class="btn" onclick="removeCompanyRule(${idx})"><i class="fas fa-trash"></i> Remover</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('') || '<div class="empty-state">Nenhuma regra adicionada</div>';
+  }
+  window.setRuleCompany = function(idx, empresaId) {
+    (window.__companyRules[idx] || (window.__companyRules[idx] = {empresa_id:null, contact_ids:[]})).empresa_id = Number(empresaId);
+  }
+  window.ruleSuggest = function(idx, q) {
+    const box = document.getElementById(`ruleSuggestBox_${idx}`);
+    const ql = (q || '').trim().toLowerCase();
+    if (!ql) { box.style.display='none'; box.innerHTML=''; return; }
+    const contacts = (window.__contacts || []).filter(c => (String(c.nome||'').toLowerCase().includes(ql) || String(c.email||'').toLowerCase().includes(ql)));
+    box.innerHTML = contacts.slice(0, 10).map(c => `<div class="asset-suggest-item" style="padding:10px;border-bottom:1px solid #e9ecef;cursor:pointer;" onclick="addRuleContact(${idx}, ${c.id})">${c.nome || 'Contato'} · ${c.email || '-'}</div>`).join('');
+    box.style.display = contacts.length ? 'block' : 'none';
+  }
+  window.addRuleContact = function(idx, id) {
+    const r = window.__companyRules[idx] || (window.__companyRules[idx] = { empresa_id: null, contact_ids: [] });
+    if (!r.contact_ids.includes(id)) r.contact_ids.push(id);
+    const box = document.getElementById(`ruleSuggestBox_${idx}`); if (box) box.style.display='none';
+    const input = document.getElementById(`ruleSearchInput_${idx}`); if (input) input.value='';
+    renderCompanyRules();
+  }
+  window.removeRuleContact = function(idx, id) {
+    const r = window.__companyRules[idx]; if (!r) return;
+    r.contact_ids = (r.contact_ids || []).filter(x => x !== id);
+    renderCompanyRules();
+  }
+  window.removeCompanyRule = function(idx) {
+    window.__companyRules.splice(idx, 1);
+    renderCompanyRules();
+  }
+  document.getElementById('addCompanyRuleBtn').addEventListener('click', () => {
+    (window.__companyRules = window.__companyRules || []).push({ empresa_id: (window.__companies[0]?.id || null), contact_ids: [] });
+    renderCompanyRules();
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    loadConfig();
+    const teamInput = document.getElementById('teamSearchInput');
+    const teamBox = document.getElementById('teamSuggestBox');
+    teamInput.addEventListener('input', (e) => { renderTeamSuggest(e.target.value) });
+    document.getElementById('saveBtn').addEventListener('click', saveConfig);
+    document.addEventListener('click', (e) => { if (!teamBox.contains(e.target) && e.target !== teamInput) { teamBox.style.display='none'; } });
+  });
+</script>
+{% endblock %}

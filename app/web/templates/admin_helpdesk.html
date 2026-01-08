@@ -11,17 +11,27 @@
   .input, .select, .textarea { width:100%; padding:10px; border:1px solid #e9ecef; border-radius:8px; font-size:14px; }
   .textarea { min-height:100px; }
   .actions { display:flex; gap:10px; margin-top:10px; }
+  .tickets-nav { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid #e9ecef; margin-bottom: 16px; }
+  .tickets-nav .nav-item { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 20px; border: 1px solid #e0e0e0; background: #fff; color: #2c3e50; cursor: pointer; font-size: 14px; text-decoration: none; }
+  .tickets-nav .nav-item.active { background: #3498db; color: #fff; border-color: #3498db; }
+  .tickets-nav .nav-item i { margin-right: 8px; }
+  .inline-admin { margin-top:12px; border:1px solid #e9ecef; border-radius:8px; overflow:hidden; background:#fff; }
+  .inline-admin iframe { width:100%; min-height:620px; border:0; background:#fff; }
 </style>
 {% endblock %}
 {% block topbar_left %}
-<h1 class="page-title">Admin Helpdesk</h1>
+<div>
+  <h1 class="page-title">Admin Helpdesk</h1>
+  <div class="tickets-nav" style="margin-top:8px;">
+    <a class="nav-item" href="/tickets"><i class="fas fa-layer-group"></i>Todos</a>
+    <a class="nav-item" href="/tickets?status=open"><i class="fas fa-folder-open"></i>Abertos</a>
+    <a class="nav-item" href="/tickets?status=closed"><i class="fas fa-archive"></i>Fechados</a>
+    <a class="nav-item active" href="/admin/helpdesk"><i class="fas fa-tools"></i>Admin Helpdesk</a>
+  </div>
+</div>
 {% endblock %}
 {% block content %}
-  <div class="row">
-    <a class="btn btn-secondary" href="/admin/ChamadoCategoria">Categorias</a>
-    <a class="btn btn-secondary" href="/admin/Prioridade">Prioridades</a>
-    <a class="btn btn-secondary" href="/admin/Contato">Agentes</a>
-  </div>
+
   <h2>Dados Básicos</h2>
   <div class="card">
     <div class="actions">
@@ -29,7 +39,10 @@
       <button class="btn" id="newPriBtn">Nova Prioridade</button>
       <button class="btn" id="newAgentBtn">Novo Agente</button>
       <button class="btn" id="refreshOptsBtn">Atualizar listas</button>
+      <button class="btn" id="newStatusBtn">Novo Status</button>
+      <button class="btn" id="newDefeitoBtn">Novo Defeito</button>
     </div>
+    <div id="inlineAdminBox" class="inline-admin"></div>
   </div>
 
   <h2>Roteamento</h2>
@@ -106,10 +119,12 @@
     const cats = await fetchJSON('/admin/ChamadoCategoria/items');
     const pris = await fetchJSON('/admin/Prioridade/items');
     const agents = await fetchJSON('/admin/Contato/items');
+    const tiposAtivo = await fetchJSON('/admin/TipoAtivo/items');
     window.__opts = {
       categorias: (cats.items || cats || []).map(x => ({id: x.id, nome: x.nome})),
       prioridades: (pris.items || pris || []).map(x => ({id: x.id, nome: x.nome})),
       agentes: (agents.items || agents || []).map(x => ({id: x.id, nome: x.nome})),
+      tiposAtivo: (tiposAtivo.items || tiposAtivo || []).map(x => ({id: x.id, nome: x.nome})),
     };
   }
   async function loadAll() {
@@ -185,11 +200,71 @@
     elEnabled.onchange = () => window.__autoClose.enabled = elEnabled.checked; elPend.oninput = () => window.__autoClose.pending_customer_days = parseInt(elPend.value || '0'); elRes.oninput = () => window.__autoClose.resolved_days = parseInt(elRes.value || '0');
   }
   document.addEventListener('DOMContentLoaded', () => {
+    function openInline(url) {
+      const box = document.getElementById('inlineAdminBox');
+      if (!box) return;
+      box.innerHTML = `<iframe src="${url}" loading="eager"></iframe>`;
+    }
+    function openCreate(model) {
+      const box = document.getElementById('inlineAdminBox');
+      if (!box) return;
+      box.innerHTML = '';
+      const formBox = document.createElement('div');
+      const title = document.createElement('h3');
+      title.textContent = `Criar ${model}`;
+      formBox.appendChild(title);
+      let fields = [];
+      if (model === 'ChamadoCategoria') {
+        const elNome = input('nome', ''); const elDesc = input('descricao', ''); const elCor = input('cor','');
+        fields = [{label:'Nome', el: elNome},{label:'Descrição', el: elDesc},{label:'Cor', el: elCor}];
+      } else if (model === 'Prioridade') {
+        const elNome = input('nome',''); const elSla = input('sla_padrao_min','', 'number');
+        fields = [{label:'Nome', el: elNome},{label:'SLA padrão (min)', el: elSla}];
+      } else if (model === 'StatusChamado') {
+        const elNome = input('nome',''); const elDesc = input('descricao',''); const elCor = input('cor',''); const elAtivo = checkbox('ativo', true);
+        fields = [{label:'Nome', el: elNome},{label:'Descrição', el: elDesc},{label:'Cor', el: elCor},{label:'Ativo', el: elAtivo}];
+      } else if (model === 'ChamadoDefeito') {
+        const elNome = input('nome',''); const elTipo = select('tipo_ativo_id', (window.__opts && window.__opts.tiposAtivo) || [], null);
+        fields = [{label:'Nome', el: elNome},{label:'Tipo de Ativo', el: elTipo}];
+      } else if (model === 'Contato') {
+        const elNome = input('nome',''); const elEmail = input('email',''); const elTel = input('telefone','');
+        fields = [{label:'Nome', el: elNome},{label:'Email', el: elEmail},{label:'Telefone', el: elTel}];
+      }
+      const rEl = row(fields);
+      formBox.appendChild(rEl);
+      const actions = document.createElement('div'); actions.className = 'actions';
+      const btnSalvar = document.createElement('button'); btnSalvar.className='btn btn-primary'; btnSalvar.textContent='Salvar';
+      const btnCancelar = document.createElement('button'); btnCancelar.className='btn'; btnCancelar.textContent='Cancelar';
+      actions.appendChild(btnSalvar); actions.appendChild(btnCancelar);
+      formBox.appendChild(actions);
+      box.appendChild(formBox);
+      btnCancelar.onclick = () => { box.innerHTML = ''; };
+      btnSalvar.onclick = async () => {
+        const data = {};
+        Array.from(rEl.querySelectorAll('[data-name]')).forEach(el => {
+          const name = el.dataset.name;
+          let val = el.type === 'checkbox' ? el.checked : el.value;
+          if (el.type === 'number') { val = el.value ? parseInt(el.value) : null; }
+          if (val === '') val = null;
+          data[name] = val;
+        });
+        try {
+          await fetchJSON(`/admin/${model}/items`, {method:'POST', body: JSON.stringify(data)});
+          document.getElementById('statusBox').textContent = `${model} criado`;
+          box.innerHTML = '';
+          if (model === 'ChamadoCategoria' || model === 'Prioridade' || model === 'Contato') { try { await loadOptions(); renderRouting(); renderMacros(); renderSLA(); } catch(e){} }
+        } catch(e) {
+          document.getElementById('statusBox').textContent = `Falha ao criar ${model}`;
+        }
+      };
+    }
     document.getElementById('saveRoutingBtn').onclick = async () => { await fetchJSON('/admin/helpdesk/routing', {method:'PUT', body:JSON.stringify({rules: window.__routing})}); document.getElementById('statusBox').textContent = 'Roteamento salvo'; };
     document.getElementById('refreshOptsBtn').onclick = async () => { try { await loadOptions(); renderRouting(); renderMacros(); renderSLA(); } catch(e){} };
-    document.getElementById('newCatBtn').onclick = () => { window.location.href = '/admin/ChamadoCategoria'; };
-    document.getElementById('newPriBtn').onclick = () => { window.location.href = '/admin/Prioridade'; };
-    document.getElementById('newAgentBtn').onclick = () => { window.location.href = '/admin/Contato'; };
+    document.getElementById('newCatBtn').onclick = () => { openCreate('ChamadoCategoria'); };
+    document.getElementById('newPriBtn').onclick = () => { openCreate('Prioridade'); };
+    document.getElementById('newAgentBtn').onclick = () => { openCreate('Contato'); };
+    document.getElementById('newStatusBtn').onclick = () => { openCreate('StatusChamado'); };
+    document.getElementById('newDefeitoBtn').onclick = () => { openCreate('ChamadoDefeito'); };
     document.getElementById('addRoutingBtn').onclick = async () => { if (!window.__opts) { try { await loadOptions(); } catch(e){} } window.__routing.push({categoria_id: null, prioridade_id: null, agente_contato_id: null, ativo: true}); renderRouting(); };
     document.getElementById('saveMacrosBtn').onclick = async () => { await fetchJSON('/admin/helpdesk/macros', {method:'PUT', body:JSON.stringify({macros: window.__macros})}); document.getElementById('statusBox').textContent = 'Macros salvas'; };
     document.getElementById('addMacroBtn').onclick = () => { window.__macros.push({nome: '', descricao: '', actions: {}}); renderMacros(); };
