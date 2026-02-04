@@ -23,4 +23,4 @@ EXPOSE 8081
 ENV APP_HOST=0.0.0.0 \
     APP_PORT=8081
 
-CMD ["python", "-m", "uvicorn", "app.main:create_app", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8081"]
