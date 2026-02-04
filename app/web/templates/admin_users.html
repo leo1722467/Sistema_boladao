@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% set sidebar_subtitle = 'Admin Usuários' %}
+{% block title %}Admin Usuários - Sistema Boladão{% endblock %}
+{% block extra_head %}
+<style>
+  .container { padding:30px; max-width:1000px; }
+  .card { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e9ecef; margin-bottom:20px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+  .form-group { flex:1; min-width:240px; }
+  .label { display:block; font-size:13px; color:#666; margin-bottom:6px; }
+  .input { width:100%; padding:10px; border:1px solid #e9ecef; border-radius:8px; font-size:14px; }
+  .actions { display:flex; gap:10px; margin-top:10px; }
+  .btn { display:inline-flex; align-items:center; padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:500; text-decoration:none; cursor:pointer; transition:all .3s ease; }
+  .btn-primary { background:linear-gradient(135deg,#3498db,#2980b9); color:white; }
+  .btn-primary:hover { background:linear-gradient(135deg,#2980b9,#21618c); transform:translateY(-1px); }
+  .success { color:#27ae60; margin-top:10px; }
+  .danger { color:#e74c3c; margin-top:10px; }
+  .small { font-size:12px; color:#777; margin-top:8px; }
+  .list { margin-top:12px; }
+  .list-item { padding:8px; border-bottom:1px solid #e9ecef; display:flex; justify-content:space-between; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+</style>
+{% endblock %}
+{% block topbar_left %}
+<h1 class="page-title">Criar Usuário</h1>
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="row">
+      <div class="form-group">
+        <label class="label">Senha</label>
+        <input id="senha" class="input" type="password" placeholder="Senha" />
+      </div>
+      <div class="form-group">
+        <label class="label">Usuário</label>
+        <select id="userSelect" class="input"></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="setPwdBtn" class="btn btn-primary"><i class="fas fa-key"></i> Definir Senha</button>
+    </div>
+    <div id="statusBox" class="success"></div>
+    <div class="small">Selecione um usuário existente e defina a senha. A senha é armazenada com hash.</div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3>Usuários existentes</h3>
+      <div id="usersList" class="list"></div>
+    </div>
+    <div class="card">
+      <h3>Usuários sem senha</h3>
+      <div id="missingList" class="list"></div>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  async function apiHeaders() {
+    const tokenCookie = document.cookie.split('; ').find(row => row.startsWith('access_token='));
+    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  }
+  async function setPassword() {
+    const senha = document.getElementById('senha').value;
+    const userId = document.getElementById('userSelect').value;
+    if (!userId || !senha) {
+      document.getElementById('statusBox').textContent = 'Selecione o usuário e informe a senha';
+      document.getElementById('statusBox').className = 'danger';
+      return;
+    }
+    const headers = await apiHeaders();
+    const res = await fetch(`/admin/users/${userId}/password`, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify({ password: senha }) });
+    if (!res.ok) {
+      let msg = 'Falha ao definir senha';
+      try { const err = await res.json(); msg = typeof err?.detail === 'string' ? err.detail : msg; } catch {}
+      document.getElementById('statusBox').textContent = msg;
+      document.getElementById('statusBox').className = 'danger';
+      return;
+    }
+    document.getElementById('statusBox').textContent = 'Senha definida com sucesso';
+    document.getElementById('statusBox').className = 'success';
+    document.getElementById('senha').value = '';
+    await loadUsers();
+  }
+  async function loadUsers() {
+    const headers = await apiHeaders();
+    const res = await fetch('/admin/users/options', { credentials:'include', headers });
+    if (!res.ok) { document.getElementById('usersList').innerHTML = 'Falha ao carregar usuários'; return; }
+    const items = await res.json();
+    const sel = document.getElementById('userSelect');
+    sel.innerHTML = (items || []).map(u => `<option value="${u.contato_id}">#${u.contato_id} · ${u.nome || '(sem nome)'} · ${u.email || ''}</option>`).join('');
+    document.getElementById('usersList').innerHTML = (items || []).map(u => {
+      return `<div class="list-item"><span>#${u.contato_id} · ${u.nome || '(sem nome)'} · ativo=${u.ativo ? 'sim' : 'não'}</span></div>`
+    }).join('') || '<div class="small">Nenhum usuário</div>';
+    const r2 = await fetch('/admin/users/options/missing-password', { credentials:'include', headers });
+    if (!r2.ok) { document.getElementById('missingList').innerHTML = 'Falha ao carregar usuários sem senha'; return; }
+    const missing = await r2.json();
+    document.getElementById('missingList').innerHTML = (missing || []).map(u => {
+      return `<div class="list-item"><span>#${u.contato_id} · ${u.nome || '(sem nome)'} · ativo=${u.ativo ? 'sim' : 'não'}</span><button class="btn" onclick="prefillUser(${u.contato_id})">Selecionar</button></div>`
+    }).join('') || '<div class="small">Nenhum usuário sem senha</div>';
+  }
+  window.prefillUser = function(contatoId) {
+    const sel = document.getElementById('userSelect');
+    sel.value = String(contatoId);
+    sel.dispatchEvent(new Event('change'));
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('setPwdBtn').addEventListener('click', setPassword);
+    loadUsers();
+  });
+</script>
+{% endblock %}

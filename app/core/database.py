@@ -242,6 +242,47 @@ class DatabaseManager:
                     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_estoque_empresa_id ON estoque(empresa_id)"))
             except Exception as e:
                 logger.error(f"Failed to ensure estoque.empresa_id: {e}")
+            
+            # pendencia table
+            try:
+                result = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='pendencia'"))
+                exists = bool(result.fetchone())
+                if not exists:
+                    await conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS pendencia (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            tag TEXT,
+                            os_origem_id INTEGER,
+                            descricao TEXT,
+                            status TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                            closed_at DATETIME,
+                            FOREIGN KEY(os_origem_id) REFERENCES ordem_servico(id)
+                        )
+                    """))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pendencia_status ON pendencia(status)"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pendencia_os ON pendencia(os_origem_id)"))
+            except Exception as e:
+                logger.error(f"Failed to ensure pendencia table: {e}")
+            
+            # ordem_servico_pendencia_solucao junction
+            try:
+                result = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='ordem_servico_pendencia_solucao'"))
+                exists = bool(result.fetchone())
+                if not exists:
+                    await conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS ordem_servico_pendencia_solucao (
+                            ordem_servico_id INTEGER NOT NULL,
+                            pendencia_id INTEGER NOT NULL,
+                            PRIMARY KEY(ordem_servico_id, pendencia_id),
+                            FOREIGN KEY(ordem_servico_id) REFERENCES ordem_servico(id) ON DELETE CASCADE,
+                            FOREIGN KEY(pendencia_id) REFERENCES pendencia(id) ON DELETE CASCADE
+                        )
+                    """))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_os_pendencia_solucao_os ON ordem_servico_pendencia_solucao(ordem_servico_id)"))
+                    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_os_pendencia_solucao_p ON ordem_servico_pendencia_solucao(pendencia_id)"))
+            except Exception as e:
+                logger.error(f"Failed to ensure ordem_servico_pendencia_solucao table: {e}")
         await engine.dispose()
     
     async def backup_database(self, backup_path: Optional[str] = None) -> bool:

@@ -10,6 +10,8 @@ from app.db.session import get_db
 from app.db.base import Base
 from app.db import models as db_models
 from app.api.auth import get_current_user_any
+from app.core.security import hash_password
+from sqlalchemy import select, update
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -358,7 +360,7 @@ async def list_items(model: str, session: AsyncSession = Depends(get_db), _: Any
     """
 
     m = _get_model(model)
-    res = await session.execute(select(m).limit(100))
+    res = await session.execute(select(m).limit(1000))
     items = [
         _to_dict(obj)
         for obj in res.scalars().all()
@@ -451,6 +453,81 @@ async def delete_item(model: str, item_id: int, session: AsyncSession = Depends(
     obj = await session.get(m, item_id)
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    await session.delete(obj)
-    await session.commit()
+    try:
+        # Special handling: deleting Contato should remove dependent UserAuth to satisfy NOT NULL FK
+        if hasattr(db_models, "Contato") and m is getattr(db_models, "Contato"):
+            try:
+                from sqlalchemy import delete
+                await session.execute(delete(getattr(db_models, "UserAuth")).where(getattr(db_models, "UserAuth").contato_id == item_id))
+            except Exception:
+                pass
+        await session.delete(obj)
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc.orig))
     return {"status": "deleted", "model": model, "id": item_id}
+
+@router.get("/users/options")
+async def list_user_options(session: AsyncSession = Depends(get_db), _: Any = Depends(get_current_user_any)) -> List[Dict[str, Any]]:
+    try:
+        res = await session.execute(
+            select(db_models.Contato, db_models.UserAuth)
+            .join(db_models.UserAuth, db_models.UserAuth.contato_id == db_models.Contato.id, isouter=True)
+            .where(
+                db_models.Contato.is_user.is_(True),
+                db_models.Contato.ativo.is_(True),
+            )
+        )
+        rows = res.all()
+        return [{"contato_id": ct.id, "nome": ct.nome, "email": ct.email, "ativo": ct.ativo, "user_id": ua.id if ua else None, "user_ativo": (ua.ativo if ua else None)} for ct, ua in rows]
+    except Exception as e:
+        logger.error(f"Failed to list users: {e}")
+        return []
+
+@router.get("/users/options/missing-password")
+async def list_users_missing_password(session: AsyncSession = Depends(get_db), _: Any = Depends(get_current_user_any)) -> List[Dict[str, Any]]:
+    try:
+        res = await session.execute(
+            select(db_models.Contato)
+            .join(db_models.UserAuth, db_models.UserAuth.contato_id == db_models.Contato.id, isouter=True)
+            .where(
+                db_models.Contato.is_user.is_(True),
+                db_models.Contato.ativo.is_(True),
+                db_models.UserAuth.id.is_(None),
+            )
+        )
+        rows = res.scalars().all()
+        return [{"contato_id": ct.id, "nome": ct.nome, "email": ct.email, "ativo": ct.ativo} for ct in rows]
+    except Exception as e:
+        logger.error(f"Failed to list users missing password: {e}")
+        return []
+
+@router.put("/users/{contato_id}/password")
+async def set_user_password(contato_id: int, payload: Dict[str, Any], session: AsyncSession = Depends(get_db), _: Any = Depends(get_current_user_any)) -> Dict[str, Any]:
+    try:
+        contato = await session.get(db_models.Contato, contato_id)
+        if not contato or not contato.ativo or not contato.is_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contato not eligible")
+        pwd = (payload.get("password") or "").strip()
+        if not pwd:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password required")
+        hashed = hash_password(pwd)
+        res = await session.execute(select(db_models.UserAuth).where(db_models.UserAuth.contato_id == contato_id))
+        user = res.scalar_one_or_none()
+        if user:
+            await session.execute(update(db_models.UserAuth).where(db_models.UserAuth.id == user.id).values(hashed_senha=hashed))
+        else:
+            entity = db_models.UserAuth(contato_id=contato_id, hashed_senha=hashed, ativo=True)
+            session.add(entity)
+        await session.commit()
+        if not user:
+            res2 = await session.execute(select(db_models.UserAuth).where(db_models.UserAuth.contato_id == contato_id))
+            user = res2.scalar_one_or_none()
+        return {"ok": True, "contato_id": contato_id, "user_id": getattr(user, "id", None), "nome": contato.nome, "ativo": contato.ativo}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Failed to set user password: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set password")

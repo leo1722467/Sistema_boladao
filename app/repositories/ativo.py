@@ -19,7 +19,7 @@ class AtivoRepository:
                 selectinload(Ativo.status),
                 selectinload(Ativo.local_instalacao),
             )
-            .limit(200)
+            .limit(2000)
         )
         res = await session.execute(stmt)
         return res.scalars().all()

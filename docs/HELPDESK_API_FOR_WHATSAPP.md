@@ -42,6 +42,28 @@
     }
     ```
   - Response: `201` with `id`, `numero` and details
+  - Requirements:
+    - The asset (`ativo_id` or `serial_text`) must belong to the same tenant (empresa) as the authenticated user; otherwise returns 403 with `tenant_scope_error`
+    - `titulo` is required, otherwise 400
+    - If `prioridade_id` is omitted, textual `prioridade` is mapped when possible
+  - Find the right asset:
+    - `GET /api/helpdesk/assets?search=<text>` lists assets for your tenant; use `id` or `serial_text` from the results in the ticket payload
+  - Example cURL:
+    ```bash
+    curl -X POST http://localhost:8081/api/helpdesk/tickets \
+      -H "Authorization: Bearer <ACCESS_TOKEN>" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "titulo": "Laptop not turning on",
+        "descricao": "No lights or sounds",
+        "prioridade": "normal",
+        "origem": "web",
+        "ativo_id": 123
+      }'
+    ```
+  - Common errors:
+    - 403: {"detail": "{'message': 'Asset does not belong to the current company', 'type': 'tenant_scope_error', 'ativo_id': <id>, 'empresa_id': <id>}"}
+    - 400: {"detail": "Titulo é obrigatório"}
 
 - List tickets
   - `GET /api/helpdesk/tickets?search=<text>&status_id=<id>&limit=50&offset=0`

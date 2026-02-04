@@ -361,7 +361,37 @@ class TicketDetailResponse(BaseModel):
                 {"id": 1, "contato": {"id": 12, "nome": "João Silva"}, "comentario": "Detalhe adicional", "data_hora": "2023-10-31T11:00:00"}
             ]
         }
-    }
+        }
+
+# Pendências
+class PendenciaResponse(BaseModel):
+    id: int = Field(...)
+    tag: Optional[str] = Field(None)
+    os_origem_id: Optional[int] = Field(None)
+    descricao: Optional[str] = Field(None)
+    status: Optional[str] = Field(None)
+    created_at: Optional[str] = Field(None)
+    closed_at: Optional[str] = Field(None)
+
+class CreatePendenciaRequest(BaseModel):
+    tag: Optional[constr(max_length=200)] = Field(None)  # type: ignore[valid-type]
+    os_origem_id: Optional[int] = Field(None, gt=0)
+    descricao: Optional[constr(max_length=1000)] = Field(None)  # type: ignore[valid-type]
+    status: Optional[constr(max_length=100)] = Field(None)  # type: ignore[valid-type]
+
+class UpdatePendenciaRequest(BaseModel):
+    tag: Optional[constr(max_length=200)] = Field(None)  # type: ignore[valid-type]
+    descricao: Optional[constr(max_length=1000)] = Field(None)  # type: ignore[valid-type]
+    status: Optional[constr(max_length=100)] = Field(None)  # type: ignore[valid-type]
+    closed_at: Optional[str] = Field(None, description="ISO timestamp for closure")
+
+class PendenciaListResponse(BaseModel):
+    pendencias: List[PendenciaResponse] = Field(...)
+
+class ResolvePendenciasRequest(BaseModel):
+    pendencia_ids: List[int] = Field(...)
+    close_pendencias: bool = Field(True)
+    
 
 
 class UpdateTicketRequest(BaseModel):

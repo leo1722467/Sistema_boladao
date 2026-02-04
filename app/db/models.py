@@ -247,6 +247,11 @@ class OrdemServicoChamado(Base):
     ordem_servico_id = mapped_column(ForeignKey("ordem_servico.id", ondelete="CASCADE"), primary_key=True)
     chamado_id = mapped_column(ForeignKey("chamado.id", ondelete="CASCADE"), primary_key=True)
 
+class OrdemServicoPendenciaSolucao(Base):
+    __tablename__ = "ordem_servico_pendencia_solucao"
+    ordem_servico_id = mapped_column(ForeignKey("ordem_servico.id", ondelete="CASCADE"), primary_key=True)
+    pendencia_id = mapped_column(ForeignKey("pendencia.id", ondelete="CASCADE"), primary_key=True)
+
 class OrdemServico(Base):
     __tablename__ = "ordem_servico"
     chamados = relationship(
@@ -269,7 +274,31 @@ class OrdemServico(Base):
 
     tipo = relationship("TipoOS", back_populates="ordens_servico")
     chamado = relationship("Chamado", back_populates="ordens_servico", foreign_keys=[chamado_id])
+    # Pendências resolvidas por esta OS (N:N)
+    pendencias_resolvidas = relationship(
+        "Pendencia",
+        secondary="ordem_servico_pendencia_solucao",
+        back_populates="ordens_servico_resolutoras",
+        lazy="selectin",
+    )
 
+class Pendencia(Base):
+    __tablename__ = "pendencia"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    tag: Mapped[str | None] = mapped_column(Text)
+    os_origem_id: Mapped[int | None] = mapped_column(ForeignKey("ordem_servico.id"))
+    descricao: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+    closed_at: Mapped[DateTime | None] = mapped_column(DateTime)
+
+    origem_os = relationship("OrdemServico", foreign_keys=[os_origem_id])
+    ordens_servico_resolutoras = relationship(
+        "OrdemServico",
+        secondary="ordem_servico_pendencia_solucao",
+        back_populates="pendencias_resolvidas",
+        lazy="selectin",
+    )
 
 class Foto(Base):
     __tablename__ = "foto"

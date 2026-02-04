@@ -18,7 +18,7 @@ from app.repositories.ativo import AtivoRepository
 from app.services.inventory import InventoryService
 from app.services.ticket import TicketService
 from app.services.ordem_servico import OrdemServicoService
-from app.db.models import StatusChamado, Prioridade, Contato
+from app.db.models import StatusChamado, Prioridade, Contato, Pendencia, OrdemServicoPendenciaSolucao, OrdemServico
 from app.repositories.chamado_defeito import ChamadoDefeitoRepository
 from app.schemas.helpdesk import (
     InventoryIntakeRequest,
@@ -30,6 +30,7 @@ from app.schemas.helpdesk import (
     AssetSummary,
     NamedEntity,
     ErrorResponse,
+    SuccessResponse,
     TicketDetailResponse,
     UpdateTicketRequest,
     TicketFilters,
@@ -44,6 +45,11 @@ from app.schemas.helpdesk import (
     CreateDefeitoRequest,
     DefeitoResponse,
     DefeitoListResponse,
+    PendenciaResponse,
+    CreatePendenciaRequest,
+    UpdatePendenciaRequest,
+    PendenciaListResponse,
+    ResolvePendenciasRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -219,7 +225,19 @@ async def list_assets(
         )
 
 
-@router.post("/tickets", response_model=TicketDetailResponse)
+@router.post(
+    "/tickets",
+    response_model=TicketDetailResponse,
+    responses={
+        200: {"description": "Ticket created successfully"},
+        400: {"model": ErrorResponse, "description": "Validation or integrity error"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Tenant scope or permission error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Create ticket",
+    description="Create a new ticket scoped to the authenticated tenant. If ativo_id or serial_text is provided, the asset must belong to the same empresa (tenant)."
+)
 async def create_ticket(
     payload: CreateTicketRequest,
     session: AsyncSession = Depends(get_db),
@@ -1013,6 +1031,176 @@ async def get_service_order_analytics(
             detail=f"An unexpected error occurred while generating analytics: {e}"
         )
 
+@router.post(
+    "/pendencias",
+    response_model=PendenciaResponse,
+    summary="Create pendencia"
+)
+async def create_pendencia(
+    payload: CreatePendenciaRequest,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> PendenciaResponse:
+    try:
+        p = Pendencia(
+            tag=payload.tag,
+            os_origem_id=payload.os_origem_id,
+            descricao=payload.descricao,
+            status=payload.status,
+        )
+        session.add(p)
+        await session.flush()
+        await session.commit()
+        return PendenciaResponse(
+            id=p.id, tag=p.tag, os_origem_id=p.os_origem_id, descricao=p.descricao,
+            status=p.status, created_at=str(p.created_at), closed_at=str(p.closed_at) if p.closed_at else None
+        )
+    except Exception as e:
+        logger.exception(f"Failed to create pendencia: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create pendencia")
+
+@router.get(
+    "/pendencias",
+    response_model=PendenciaListResponse,
+    summary="List pendencias"
+)
+async def list_pendencias(
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+    status: Optional[str] = None,
+    os_origem_id: Optional[int] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> PendenciaListResponse:
+    try:
+        from sqlalchemy import select, or_
+        q = select(Pendencia).offset(offset).limit(limit)
+        if status:
+            q = q.where(Pendencia.status.ilike(f"%{status}%"))
+        if os_origem_id:
+            q = q.where(Pendencia.os_origem_id == os_origem_id)
+        if search:
+            ss = f"%{search}%"
+            q = q.where(or_(Pendencia.tag.ilike(ss), Pendencia.descricao.ilike(ss)))
+        rows = await session.execute(q)
+        items = rows.scalars().all()
+        return PendenciaListResponse(
+            pendencias=[
+                PendenciaResponse(
+                    id=p.id, tag=p.tag, os_origem_id=p.os_origem_id, descricao=p.descricao,
+                    status=p.status, created_at=str(p.created_at), closed_at=str(p.closed_at) if p.closed_at else None
+                )
+                for p in items
+            ]
+        )
+    except Exception as e:
+        logger.exception(f"Failed to list pendencias: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list pendencias")
+
+@router.get(
+    "/pendencias/{pendencia_id}",
+    response_model=PendenciaResponse,
+    summary="Get pendencia"
+)
+async def get_pendencia(
+    pendencia_id: int,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> PendenciaResponse:
+    p = await session.get(Pendencia, pendencia_id)
+    if not p:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pendencia not found")
+    return PendenciaResponse(
+        id=p.id, tag=p.tag, os_origem_id=p.os_origem_id, descricao=p.descricao,
+        status=p.status, created_at=str(p.created_at), closed_at=str(p.closed_at) if p.closed_at else None
+    )
+
+@router.put(
+    "/pendencias/{pendencia_id}",
+    response_model=PendenciaResponse,
+    summary="Update pendencia"
+)
+async def update_pendencia(
+    pendencia_id: int,
+    payload: UpdatePendenciaRequest,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> PendenciaResponse:
+    p = await session.get(Pendencia, pendencia_id)
+    if not p:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pendencia not found")
+    for field, value in payload.dict(exclude_unset=True).items():
+        if field == "closed_at" and value:
+            try:
+                from datetime import datetime
+                setattr(p, field, datetime.fromisoformat(value.replace('Z', '+00:00')))
+            except ValueError:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid datetime format for closed_at")
+        else:
+            setattr(p, field, value)
+    await session.flush()
+    await session.commit()
+    return PendenciaResponse(
+        id=p.id, tag=p.tag, os_origem_id=p.os_origem_id, descricao=p.descricao,
+        status=p.status, created_at=str(p.created_at), closed_at=str(p.closed_at) if p.closed_at else None
+    )
+
+@router.post(
+    "/service-orders/{service_order_id}/pendencias/resolve",
+    response_model=SuccessResponse,
+    summary="Link resolved pendencias to service order (and optionally close them)"
+)
+async def resolve_pendencias_for_service_order(
+    service_order_id: int,
+    payload: ResolvePendenciasRequest,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> SuccessResponse:
+    try:
+        os_row = await session.get(OrdemServico, service_order_id)
+        if not os_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service order not found")
+        # Link pendencias
+        for pid in payload.pendencia_ids:
+            session.add(OrdemServicoPendenciaSolucao(ordem_servico_id=service_order_id, pendencia_id=pid))
+            if payload.close_pendencias:
+                p = await session.get(Pendencia, pid)
+                if p:
+                    p.status = "concluida"
+                    from datetime import datetime
+                    p.closed_at = datetime.utcnow()
+        await session.flush()
+        await session.commit()
+        return SuccessResponse(message="Pendencias linked to service order", data={"service_order_id": service_order_id, "pendencia_ids": payload.pendencia_ids})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to resolve pendencias for service order {service_order_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to resolve pendencias")
+
+@router.get(
+    "/service-orders/{service_order_id}/pendencias",
+    response_model=PendenciaListResponse,
+    summary="List pendencias resolved by a service order"
+)
+async def list_pendencias_for_service_order(
+    service_order_id: int,
+    session: AsyncSession = Depends(get_db),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> PendenciaListResponse:
+    try:
+        from sqlalchemy import select
+        q = select(Pendencia).join(OrdemServicoPendenciaSolucao).where(OrdemServicoPendenciaSolucao.ordem_servico_id == service_order_id).limit(500)
+        res = await session.execute(q)
+        items = res.scalars().all()
+        return PendenciaListResponse(pendencias=[PendenciaResponse(
+            id=p.id, tag=p.tag, os_origem_id=p.os_origem_id, descricao=p.descricao,
+            status=p.status, created_at=str(p.created_at), closed_at=str(p.closed_at) if p.closed_at else None
+        ) for p in items])
+    except Exception as e:
+        logger.exception(f"Failed to list pendencias for service order {service_order_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list pendencias")
 
 @router.put(
     "/service-orders/{service_order_id}",

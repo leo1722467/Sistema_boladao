@@ -95,6 +95,10 @@ async def admin_kb(request: Request, _: Any = Depends(get_current_user_any)) -> 
 async def admin_notifications(request: Request, _: Any = Depends(get_current_user_any)) -> HTMLResponse:
     return templates.TemplateResponse("admin_notifications.html", {"request": request})
 
+@router.get("/users", response_class=HTMLResponse)
+async def admin_users(request: Request, _: Any = Depends(get_current_user_any)) -> HTMLResponse:
+    return templates.TemplateResponse("admin_users.html", {"request": request})
+
 
 @router.get("/{model}", response_class=HTMLResponse)
 async def admin_model_list(model: str, request: Request, _: Any = Depends(get_current_user_any)) -> HTMLResponse:
